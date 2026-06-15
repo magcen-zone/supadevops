@@ -1,0 +1,14 @@
+{
+  "name": "supa-marketplace",
+  "owner": { "name": "magcen-zone" },
+  "metadata": {
+    "description": "supadevops 配布用マーケットプレイス(本社: github.com/magcen-zone)。"
+  },
+  "plugins": [
+    {
+      "name": "supadevops",
+      "source": "./",
+      "description": "JSDoc 契約優先 + TDD 開発フロー(Next.js / Expo モノレポ)。"
+    }
+  ]
+}
