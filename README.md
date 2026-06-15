@@ -1,6 +1,6 @@
-# jam-dev 仕様 — JSDoc 契約優先 + TDD 開発フロー
+# supadevops 仕様 — JSDoc 契約優先 + TDD 開発フロー
 
-本仕様は、Claude Code プラグイン **jam-dev** が課す開発フローを規定する。jam-dev は Superpowers を補強し、Claude Code による **Next.js(App Router)** 開発において、実装より先に JSDoc で契約を確定させる。契約を起点に、**単体(ヘルパー・Server Action)は test-first(red → green)、endpoint・end2end(API・UI)は実装後の受入テスト**として検証し(§2.1)、各フェーズにヒューマンゲートを課す。機能追加・バグ修正は本フローを1サイクルとして反復し、各サイクルは回帰安全(§2.2)とする。本書は2部構成:第 I 部が方法論(§1–§4)、第 II 部が jam-dev プラグインの構築・配布(§5–§8)。
+本仕様は、Claude Code プラグイン **supadevops** が課す開発フローを規定する。supadevops は Superpowers を補強し、Claude Code による **Next.js(App Router)** 開発において、実装より先に JSDoc で契約を確定させる。契約を起点に、**単体(ヘルパー・Server Action)は test-first(red → green)、endpoint・end2end(API・UI)は実装後の受入テスト**として検証し(§2.1)、各フェーズにヒューマンゲートを課す。機能追加・バグ修正は本フローを1サイクルとして反復し、各サイクルは回帰安全(§2.2)とする。本書は2部構成:第 I 部が方法論(§1–§4)、第 II 部が supadevops プラグインの構築・配布(§5–§8)。
 
 ---
 
@@ -14,7 +14,7 @@
 |---|---|
 | 言語・型 | JavaScript + JSDoc。型はすべて JSDoc(`@typedef` / `@param` / `@returns` 等)で記す。`.d.ts` は作らない。型検査は `tsc`(出力なし) |
 | モジュール | ESM(`import` / `export`、`package.json` に `"type": "module"`) |
-| 対象 | jam-dev を適用する Next.js リポジトリ。契約・検証は全コードに課す(コード種別ごとの手段は §3.6、構成・配置は §1.4) |
+| 対象 | supadevops を適用する Next.js リポジトリ。契約・検証は全コードに課す(コード種別ごとの手段は §3.6、構成・配置は §1.4) |
 | ディレクトリ | Next.js `src/app` モード(`src/` 構成)。`src/helper/`(ヘルパー=純粋関数)/ `src/action/`(Server Action・使う場合)/ `src/component/`(コンポーネント)/ `src/type/`(共有 `@typedef`・JS+JSDoc)/ `src/app/`(page・layout・`api/**/route.js`)でモジュール化する。テストは §3.4 |
 | テスト | 単体 = Jest、endpoint・end2end = Playwright |
 | 文書 | Markdown + Mermaid |
@@ -36,22 +36,22 @@
 
 - **契約** — JSDoc による型(`@param` / `@returns` / `@typedef` 等)と一行の意図(振る舞い)。module / class / function / component props の各層に記す。
 - **スタブ** — 契約のみを持ち、本体が `throw new Error('not implemented')` の宣言。
-- **規律** — jam が課す JS+JSDoc 固有の規則(契約優先・`tsc`/`jest` 検証・配置規約)。
+- **規律** — supa が課す JS+JSDoc 固有の規則(契約優先・`tsc`/`jest` 検証・配置規約)。
 - **回帰安全** — サイクルの完了条件「全テスト + 型検査が緑」により、以前緑だった挙動が壊れない性質(§2.2)。
 - **ヘルパー** — UI / Route Handler から抽出した純粋関数(framework 非依存・決定的)。`src/helper/` に置き、Jest 単体でテストする。
 - **Route Handler(BFF)** — `src/app/api/**/route.js`。共通サービスを呼ぶ薄い API 境界。endpoint で検証する。
 - **Server Action** — `'use server'` を持つ関数。React のフォーム/クライアントから呼ぶ **UI のミューテーション手段**で、**製品(front office)にのみ存在する**(使うかは任意。既定の変更系統は Route Handler)。`src/action/` に集約し、関数として Jest(共通サービスの HTTP は MSW で mock)で検証する(純粋部はヘルパーへ抽出)。
-- **共通サービス(middle office)** — 複数の製品(front office)から再利用される共有業務能力層。Next.js API 専用のマイクロサービス群を1つの別リポ(npm workspaces モノレポ)に集約する(構成・配置は §1.4)。製品の Route Handler(back office)経由で呼ぶ。本リポからはテストで差し替える(MSW / stub)。jam-dev は当該モノレポにも同様に適用する。
+- **共通サービス(middle office)** — 複数の製品(front office)から再利用される共有業務能力層。Next.js API 専用のマイクロサービス群を1つの別リポ(npm workspaces モノレポ)に集約する(構成・配置は §1.4)。製品の Route Handler(back office)経由で呼ぶ。本リポからはテストで差し替える(MSW / stub)。supadevops は当該モノレポにも同様に適用する。
 - **endpoint** — Route Handler(API)を Playwright `request` で検証するテスト(ブラウザ無し・共通サービスは dev サーバで stub)。配置は §3.4。
 - **end2end** — UI / ブラウザフローを Playwright で検証するテスト。配置は §3.4。
 - **red / green** — テストが失敗 / 成功する状態(TDD)。
 - **断言(assertion)** — 期待結果を検証する文(`expect(...)` 等)。
-- **駆動役** — 実装を進める主体。会話内 subagent または jam-dev の Workflow(§4.1)。
-- **Workflow** — Claude Code の本体機能。JS スクリプトで subagent を並列/逐次実行する。jam-dev の `jam-<機能>-workflow.js` はこの Workflow スクリプト(§5)。
+- **駆動役** — 実装を進める主体。会話内 subagent または supadevops の Workflow(§4.1)。
+- **Workflow** — Claude Code の本体機能。JS スクリプトで subagent を並列/逐次実行する。supadevops の `supa-<機能>-workflow.js` はこの Workflow スクリプト(§5)。
 
 ### 1.4 対象プロジェクトのデプロイ構成
 
-jam-dev は Next.js リポジトリ単位で適用する。対象は役割により front office / back office / middle office の3層に分かれ、2種類の配置先へデプロイする。本節はその構成・配置先・手順を自己完結で規定する(プラットフォームの最終挙動は Google Cloud / Firebase 公式文書を正とする)。
+supadevops は Next.js リポジトリ単位で適用する。対象は役割により front office / back office / middle office の3層に分かれ、2種類の配置先へデプロイする。本節はその構成・配置先・手順を自己完結で規定する(プラットフォームの最終挙動は Google Cloud / Firebase 公式文書を正とする)。
 
 #### 層の定義
 
@@ -63,7 +63,7 @@ front office と back office は同一 Next.js アプリの2層であり、合�
 
 #### 配置(どこに)
 
-| 層 | jam-dev 形状 | デプロイ単位 | デプロイ先 | ingress |
+| 層 | supadevops 形状 | デプロイ単位 | デプロイ先 | ingress |
 |---|---|---|---|---|
 | **front office + back office**(製品) | UI アプリ(BFF) | アプリ1つ | App Hosting | 公開 + CDN |
 | **middle office**(共通サービス) | API 専用サービス | モノレポ内の各マイクロサービス | raw Cloud Run | internal |
@@ -148,7 +148,7 @@ middle-office/                     # 共通サービスモノレポ（front offi
 #### 設定・認証
 
 - **設定ファイル規約** — `apphosting.yaml` / `service.yaml` は拡張子(`.yml` / `.yaml`)を保ちつつ中身を JSON 構文で記す(YAML は JSON のスーパーセット)。JSON はコメント不可のため、説明は文書・コード側に置く。
-- **サービス間認証(IAM)** — jam-dev で middle office(共通サービス)を扱う際、その ingress を internal とし、back office(Route Handler)からの呼び出しはサービスアカウント + ID token(IAM)で認証する(Cloud Run ネイティブの service-to-service)。ブラウザから middle office へは直結しない。
+- **サービス間認証(IAM)** — supadevops で middle office(共通サービス)を扱う際、その ingress を internal とし、back office(Route Handler)からの呼び出しはサービスアカウント + ID token(IAM)で認証する(Cloud Run ネイティブの service-to-service)。ブラウザから middle office へは直結しない。
 
 > テストとの対応: この internal な middle office 境界が §3.6 の「Route Handler が共通サービスを呼ぶ箇所はテストで差し替える」に当たる(endpoint は env で stub、Server Action は MSW)。
 
@@ -436,7 +436,7 @@ describe('checkout', () => {
 
 ## 4. Superpowers との関係
 
-jam-dev は Superpowers を置き換えず補強する。汎用プロセスの各フェーズに、JS+JSDoc 固有の規律(JSDoc 契約・`tsc`/`jest` 検証・並列実装)を注入する。
+supadevops は Superpowers を置き換えず補強する。汎用プロセスの各フェーズに、JS+JSDoc 固有の規律(JSDoc 契約・`tsc`/`jest` 検証・並列実装)を注入する。
 
 ```mermaid
 flowchart TB
@@ -444,9 +444,9 @@ flowchart TB
       direction LR
       B["brainstorming"] --> PL["plan"] --> IMP["implementation(TDD)"] --> CR["code review"]
     end
-    subgraph JAM["jam-dev(JS+JSDoc 固有の規律を注入して補強)"]
+    subgraph SUPA["supadevops(JS+JSDoc 固有の規律を注入して補強)"]
       direction LR
-      J0["要件明確化"] --> J1["Plan(契約)<br/>.js/.jsx に JSDoc+スタブ"] --> J23["Test(red)→Implement<br/>+Workflow並列(任意)"] --> J5["Finish<br/>jam-review(任意)"]
+      J0["要件明確化"] --> J1["Plan(契約)<br/>.js/.jsx に JSDoc+スタブ"] --> J23["Test(red)→Implement<br/>+Workflow並列(任意)"] --> J5["Finish<br/>supa-review(任意)"]
     end
     B -.->|注入| J0
     PL -.->|注入| J1
@@ -454,7 +454,7 @@ flowchart TB
     CR -.->|注入| J5
 
     style SP fill:#8b949e14,stroke:#8b949e,stroke-width:1px;
-    style JAM fill:#1f6feb14,stroke:#58a6ff,stroke-width:1px;
+    style SUPA fill:#1f6feb14,stroke:#58a6ff,stroke-width:1px;
 ```
 
 | Superpowers のフェーズ | 方針 |
@@ -462,7 +462,7 @@ flowchart TB
 | brainstorming | Superpowers を直接使う |
 | plan | 補強。Plan で実 `.js / .jsx` に JSDoc 契約を直接書く |
 | subagent-driven implementation | フェーズ1–3 に規律を注入(§4.1) |
-| code review | Superpowers を直接使う。JS+JSDoc 特化が要れば `jam-reviewer` で補強 |
+| code review | Superpowers を直接使う。JS+JSDoc 特化が要れば `supa-reviewer` で補強 |
 
 契約スタブはインターフェースであり実装本体ではない(本体は `throw` のみ)。単体テストは実装より前に書くため(endpoint・end2end は実装後の受入テスト。§2.1)、Superpowers の「テスト先行」原則と両立する。
 
@@ -471,13 +471,13 @@ flowchart TB
 ```mermaid
 flowchart TB
     subgraph L1["規律の層 — 常に併用(衝突しない)"]
-      A["jam: JSDoc契約優先<br/>契約→テスト→実装・tsc/jest"]
+      A["supa: JSDoc契約優先<br/>契約→テスト→実装・tsc/jest"]
       B2["Superpowers: TDD"]
       A -.->|併用| B2
     end
     subgraph L2["オーケストレーションの層 — ここだけ択一"]
       C["① 会話内 subagent-driven(既定)"]
-      D2["② jam-dev Workflow 並列(任意)"]
+      D2["② supadevops Workflow 並列(任意)"]
       C -.->|どちらか一方| D2
     end
     L1 --> L2
@@ -486,8 +486,8 @@ flowchart TB
     style L2 fill:#a371f714,stroke:#a371f7,stroke-width:1px;
 ```
 
-- 規律(JSDoc 契約優先 + Superpowers TDD)は常に併用する。jam の核心「コード前に JSDoc 契約を確定」はどの実装方法でも適用する。
-- 択一なのは実装の駆動役だけとする:① 会話内 subagent-driven(既定)、② jam-dev Workflow 並列(§5、任意)。
+- 規律(JSDoc 契約優先 + Superpowers TDD)は常に併用する。supa の核心「コード前に JSDoc 契約を確定」はどの実装方法でも適用する。
+- 択一なのは実装の駆動役だけとする:① 会話内 subagent-driven(既定)、② supadevops Workflow 並列(§5、任意)。
 - 同じモジュール群に対し ① と ② を同時に走らせてはならない。
 
 ---
@@ -496,44 +496,44 @@ flowchart TB
 
 ## 5. Workflow 統合(実装フェーズの並列加速)
 
-jam-dev は、人間ゲートを挟まない実行フェーズ(3 実装 / 4 受入 / 5 レビュー)を並列化する Workflow を3つ定義する。Workflow は Claude Code 本体機能で走行中は人間入力を受け付けないため、1 Workflow = 1フェーズとし、ヒューマンゲートは会話側(skill)が維持する。
+supadevops は、人間ゲートを挟まない実行フェーズ(3 実装 / 4 受入 / 5 レビュー)を並列化する Workflow を3つ定義する。Workflow は Claude Code 本体機能で走行中は人間入力を受け付けないため、1 Workflow = 1フェーズとし、ヒューマンゲートは会話側(skill)が維持する。
 
 | Workflow ファイル | フェーズ | 並列単位 |
 |---|---|---|
-| `jam-implement-workflow.js` | 3 実装 | red 済み独立モジュールごとに実装 → jest+tsc |
-| `jam-acceptance-workflow.js` | 4 受入 | Route Handler ごとに endpoint、ルートごとに end2end |
-| `jam-review-workflow.js` | 5 レビュー | ファイル / 観点ごとにレビュー |
+| `supa-implement-workflow.js` | 3 実装 | red 済み独立モジュールごとに実装 → jest+tsc |
+| `supa-acceptance-workflow.js` | 4 受入 | Route Handler ごとに endpoint、ルートごとに end2end |
+| `supa-review-workflow.js` | 5 レビュー | ファイル / 観点ごとにレビュー |
 
 ```mermaid
 sequenceDiagram
     participant U as ユーザー
-    participant S as jam-tdd skill(会話)
-    participant K as jam-implement skill
+    participant S as supa-tdd skill(会話)
+    participant K as supa-implement skill
     participant W as Workflow ツール
-    participant A as jam-implementer ×N
-    U->>S: /jam(フェーズ1〜2 を承認しながら)
+    participant A as supa-implementer ×N
+    U->>S: /supa(フェーズ1〜2 を承認しながら)
     S->>U: 実装フェーズ。並列化する?
     U->>S: はい(オプトイン)
     S->>K: authoring プロンプト適用
-    K->>W: jam-implement-workflow.js を生成し Workflow({name}) 起動
+    K->>W: supa-implement-workflow.js を生成し Workflow({name}) 起動
     W->>A: 各モジュール: 実装→jest+tsc
     A-->>W: green / 失敗
     W-->>S: 集約結果 → フェーズ4(ゲート)
 ```
 
-- **雛形は同梱しない。** 各 Workflow は専用スキル(`jam-implement` / `jam-acceptance` / `jam-review`)が持つ authoring プロンプトに従い、オプトイン時に `.claude/workflows/jam-<機能>-workflow.js` を生成して `Workflow({ name })` で起動する(`workflow` はプラグイン部品でないため、部品である skill が生成を担う。配置スコープは §7)。
+- **雛形は同梱しない。** 各 Workflow は専用スキル(`supa-implement` / `supa-acceptance` / `supa-review`)が持つ authoring プロンプトに従い、オプトイン時に `.claude/workflows/supa-<機能>-workflow.js` を生成して `Workflow({ name })` で起動する(`workflow` はプラグイン部品でないため、部品である skill が生成を担う。配置スコープは §7)。
 - **対象** — 独立モジュール(互いに import 依存が無く並列実装で衝突しないもの)が3つ以上、かつユーザー同意時。`args` は未実装スタブを含む `.js / .jsx`(`{ file, testFile }` の配列)から導く。
-- **subagent** — `agentType: 'jam-implementer'`(実装・受入テスト生成)、`jam-reviewer`(レビュー)を使い、内部でも JSDoc / `tsc` / `jest` の規律を適用する。
+- **subagent** — `agentType: 'supa-implementer'`(実装・受入テスト生成)、`supa-reviewer`(レビュー)を使い、内部でも JSDoc / `tsc` / `jest` の規律を適用する。
 
 ```js
 export const meta = {
-  name: 'jam-implement-workflow',
+  name: 'supa-implement-workflow',
   description: 'red 済みモジュールを並列実装し jest+tsc が緑になるまで検証',
   phases: [{ title: 'Implement' }, { title: 'Verify' }],
 }
 const out = await pipeline(args,
   m => agent(`${m.file} のスタブ本体を実装し ${m.testFile} を green に。ESM・throw を残さない。`,
-             { agentType: 'jam-implementer', label: `impl:${m.file}`, phase: 'Implement' }),
+             { agentType: 'supa-implementer', label: `impl:${m.file}`, phase: 'Implement' }),
   (_, m) => agent(`${m.file} を検証: jest と tsc -p jsconfig.json --noEmit。失敗なら原因を返す。`,
              { label: `verify:${m.file}`, phase: 'Verify', schema: VERDICT }))
 return { results: out.filter(Boolean) }
@@ -544,27 +544,27 @@ return { results: out.filter(Boolean) }
 ## 6. プラグイン構成
 
 ```
-jam-dev/                               # GitHub: gracia-popo/jam-dev で配布
+supadevops/                               # GitHub: gracia-popo/supadevops で配布
 ├── .claude-plugin/
-│   ├── plugin.json                    # name: jam-dev / 依存: superpowers
-│   └── marketplace.json               # name: jam-marketplace / source "./"
+│   ├── plugin.json                    # name: supadevops / 依存: superpowers
+│   └── marketplace.json               # name: supa-marketplace / source "./"
 ├── skills/
-│   ├── jam-tdd/                       # 中核(5フェーズ・ゲート・規約・記入例)
-│   ├── jam-implement/                 # F3 並列実装 Workflow の authoring プロンプト
-│   ├── jam-acceptance/                # F4 並列受入 Workflow の authoring プロンプト
-│   └── jam-review/                    # F5 並列レビュー Workflow の authoring プロンプト
+│   ├── supa-tdd/                       # 中核(5フェーズ・ゲート・規約・記入例)
+│   ├── supa-implement/                 # F3 並列実装 Workflow の authoring プロンプト
+│   ├── supa-acceptance/                # F4 並列受入 Workflow の authoring プロンプト
+│   └── supa-review/                    # F5 並列レビュー Workflow の authoring プロンプト
 ├── agents/
-│   ├── jam-implementer.md             # 実装・受入テスト生成担当
-│   └── jam-reviewer.md                # レビュー担当
+│   ├── supa-implementer.md             # 実装・受入テスト生成担当
+│   └── supa-reviewer.md                # レビュー担当
 ├── hooks/
 │   ├── hooks.json                     # Stop(検証)
 │   └── validate.sh                    # 設定があれば tsc(jsconfig)+ jest
 ├── commands/
-│   └── jam.md                         # /jam(起動)
+│   └── supa.md                         # /supa(起動)
 └── README.md
 ```
 
-skill を中核とし、subagent / hook / command を同梱する。`workflow` はプラグインのコンポーネント定義に存在しないため雛形は同梱せず、各 `jam-<機能>` skill が必要時に `.claude/workflows/jam-<機能>-workflow.js` を生成して実体化する(§5)。
+skill を中核とし、subagent / hook / command を同梱する。`workflow` はプラグインのコンポーネント定義に存在しないため雛形は同梱せず、各 `supa-<機能>` skill が必要時に `.claude/workflows/supa-<機能>-workflow.js` を生成して実体化する(§5)。
 
 ---
 
@@ -572,19 +572,19 @@ skill を中核とし、subagent / hook / command を同梱する。`workflow` �
 
 | 対象 | 名前 |
 |---|---|
-| プラグイン / 中核 skill / マーケットプレイス | `jam-dev` / `jam-tdd` / `jam-marketplace` |
-| Workflow skill(authoring) | `jam-implement` / `jam-acceptance` / `jam-review` |
-| 生成される Workflow | `jam-implement-workflow.js` / `jam-acceptance-workflow.js` / `jam-review-workflow.js`(`.claude/workflows/`) |
-| subagent | `jam-implementer` / `jam-reviewer` |
-| コマンド | `/jam`(起動) |
+| プラグイン / 中核 skill / マーケットプレイス | `supadevops` / `supa-tdd` / `supa-marketplace` |
+| Workflow skill(authoring) | `supa-implement` / `supa-acceptance` / `supa-review` |
+| 生成される Workflow | `supa-implement-workflow.js` / `supa-acceptance-workflow.js` / `supa-review-workflow.js`(`.claude/workflows/`) |
+| subagent | `supa-implementer` / `supa-reviewer` |
+| コマンド | `/supa`(起動) |
 
 配置は install の `--scope` で決まる。プラグイン本体は常に `~/.claude/plugins/cache/...`(HOME)に置かれ、生成される Workflow と宣言の置き場所のみスコープで変わる。
 
 ```mermaid
 flowchart TD
     I{"install --scope ?"}
-    I -->|--scope project| PROJ["skill が repo/.claude/workflows/jam-*-workflow.js を生成<br/>+ repo/.claude/settings.json<br/>(チーム共有)"]
-    I -->|既定 user| HOME["skill が ~/.claude/workflows/jam-*-workflow.js を生成<br/>+ ~/.claude/settings.json<br/>(個人・全プロジェクト)"]
+    I -->|--scope project| PROJ["skill が repo/.claude/workflows/supa-*-workflow.js を生成<br/>+ repo/.claude/settings.json<br/>(チーム共有)"]
+    I -->|既定 user| HOME["skill が ~/.claude/workflows/supa-*-workflow.js を生成<br/>+ ~/.claude/settings.json<br/>(個人・全プロジェクト)"]
     BODY["プラグイン本体は常に<br/>~/.claude/plugins/cache/...(HOME)"]
 ```
 
@@ -593,9 +593,9 @@ flowchart TD
 ```json
 {
   "extraKnownMarketplaces": {
-    "jam-marketplace": { "source": { "source": "github", "repo": "gracia-popo/jam-dev" } }
+    "supa-marketplace": { "source": { "source": "github", "repo": "gracia-popo/supadevops" } }
   },
-  "enabledPlugins": { "jam-dev@jam-marketplace": true }
+  "enabledPlugins": { "supadevops@supa-marketplace": true }
 }
 ```
 
@@ -606,6 +606,6 @@ flowchart TD
 - **plugin.json** — `name` 必須。依存は `dependencies: [{ "name": "superpowers" }]`(文字列 `"superpowers"` も可)。
 - **marketplace.json** — `name / owner / plugins[]`。`source` は `./` で始まる相対パス必須(ルート同居は `"./"`)。`metadata.description` 推奨。
 - **コンポーネント** — `skills / agents / hooks / commands / .mcp.json / .lsp.json / monitors / output-styles`(`workflows` は含まれない)。
-- **hooks** — `hooks/hooks.json`。jam-dev は `Stop`(検証)を使用。コマンドで `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PROJECT_DIR}` を使用可。
+- **hooks** — `hooks/hooks.json`。supadevops は `Stop`(検証)を使用。コマンドで `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PROJECT_DIR}` を使用可。
 - **配布スコープ** — `claude plugin install <p>@<mp> --scope user|project`(配置先・宣言は §7 が正本)。`extraKnownMarketplaces` 併記でチーム自動解決。
 - **Workflow** — `Workflow({ name })` は `.claude/workflows/` を解決、`Workflow({ scriptPath })` は任意の `.js` を実行する。`args` は実 JSON で渡る。
