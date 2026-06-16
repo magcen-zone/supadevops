@@ -1,5 +1,5 @@
 ---
-description: supadevops の JSDoc 契約優先 + TDD 開発フロー(5フェーズ)を起動する
+description: supadevops の契約優先 TDD 開発フロー(5フェーズ・ヒューマンゲート)を起動する。supa-tdd スキルを適用して機能追加/バグ修正を進める
 argument-hint: [機能やバグの簡単な説明（任意）]
 ---
 
@@ -18,4 +18,4 @@ supadevops の開発フローを開始する。**`supa-tdd` スキルを読み�
 
 実装フェーズ(3 実装 / 4 受入 / 5 レビュー)で独立モジュールが3つ以上あり、ユーザーが望む場合は、並列加速のため `supa-implement` / `supa-acceptance` / `supa-review` スキルの利用を提案する(オプトイン。1 Workflow = 1フェーズ。会話側がヒューマンゲートを維持)。
 
-まだ npm workspaces + turborepo のモノレポが無い新規プロジェクトであれば、先に **`/supa-init`** を案内する。詳細な規約・記入例は本プラグインの `README.md`(§2–§3)を正典とする。
+まだ npm workspaces + turborepo のモノレポが無い新規プロジェクトであれば、先に **`/supa-init`** を案内する。規約は `supa-tdd` スキルに従う(本コマンドはその起動口)。

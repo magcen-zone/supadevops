@@ -97,7 +97,9 @@ supadevops は **npm workspaces + turborepo のモノレポ**単位で適用す�
 └─ package/                        # 共有ライブラリ群（複数可）
    ├─ order/                       # 例: プラットフォーム非依存ロジック・型
    │  ├─ package.json
-   │  └─ src/ helper/ type/
+   │  └─ src/
+   │     ├─ helper/
+   │     └─ type/
    └─ api-client/
       └─ …（同構成）
 ```
@@ -586,7 +588,7 @@ return { results: out.filter(Boolean) }
 supadevops/                               # GitHub: magcen-zone/supadevops で配布
 ├── .claude-plugin/
 │   ├── plugin.json                    # name: supadevops / 依存: superpowers
-│   └── marketplace.json               # name: supa-marketplace / source "./"
+│   └── marketplace.json               # name: magcen-zone / source "./"
 ├── skills/
 │   ├── supa-tdd/                       # 中核(5フェーズ・ゲート・規約・記入例)
 │   ├── supa-implement/                 # F3 並列実装 Workflow の authoring プロンプト
@@ -612,7 +614,7 @@ skill を中核とし、subagent / hook / command を同梱する。`workflow` �
 
 | 対象 | 名前 |
 |---|---|
-| プラグイン / 中核 skill / マーケットプレイス | `supadevops` / `supa-tdd` / `supa-marketplace` |
+| プラグイン / 中核 skill / マーケットプレイス | `supadevops` / `supa-tdd` / `magcen-zone` |
 | Workflow skill(authoring) | `supa-implement` / `supa-acceptance` / `supa-review` |
 | 生成される Workflow | `supa-implement-workflow.js` / `supa-acceptance-workflow.js` / `supa-review-workflow.js`(`.claude/workflows/`) |
 | subagent | `supa-implementer` / `supa-reviewer` |
@@ -633,9 +635,9 @@ flowchart TD
 ```json
 {
   "extraKnownMarketplaces": {
-    "supa-marketplace": { "source": { "source": "github", "repo": "magcen-zone/supadevops" } }
+    "magcen-zone": { "source": { "source": "github", "repo": "magcen-zone/supadevops" } }
   },
-  "enabledPlugins": { "supadevops@supa-marketplace": true }
+  "enabledPlugins": { "supadevops@magcen-zone": true }
 }
 ```
 

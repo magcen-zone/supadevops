@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # supadevops Stop フック — 回帰確認(高速)。
 #
-# 仕様(README §2.2 / §3.7 / §6):完了前に `turbo run typecheck test`
+# 仕様: 完了前に `turbo run typecheck test`
 # (全ワークスペースの tsc --noEmit + jest〔jest-expo 含む〕)を緑にする。
 # endpoint / end2end(Playwright / Maestro)は重く非対話のため Stop には含めない
 # (フェーズ4 受入 + 任意で CI で実行する)。

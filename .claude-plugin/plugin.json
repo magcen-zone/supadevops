@@ -3,7 +3,7 @@
   "displayName": "supadevops",
   "version": "0.2.0",
   "description": "JSDoc 契約優先 + TDD の開発フローを Next.js(App Router)/ Expo の npm workspaces + turborepo モノレポに課す、Superpowers 補強プラグイン。",
-  "author": { "name": "magcen-zone" },
+  "author": { "name": "EISYOU", "email": "eneisyou@gmail.com" },
   "homepage": "https://github.com/magcen-zone/supadevops",
   "repository": "https://github.com/magcen-zone/supadevops",
   "license": "MIT",

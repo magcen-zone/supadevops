@@ -1,23 +1,49 @@
 ---
 name: supa-implement
-description: supadevops フェーズ3(実装)の並列加速。red 済みの独立モジュールが3つ以上ありユーザーがオプトインしたとき、supa-implement-workflow.js を生成して Workflow で並列実装(各モジュール: 実装→turbo typecheck test)する authoring プロンプト。
+description: supadevops フェーズ3(実装)の並列加速 authoring スキル。red 済みで互いに独立したモジュールが3つ以上あり、ユーザーが並列化にオプトインしたとき、.claude/workflows/supa-implement-workflow.js を生成し Workflow で各モジュールを並列実装→turbo typecheck test する。supa-tdd の実装フェーズで「並列化する?」に同意が得られた場面で使う。モジュールが2つ以下・相互依存・オプトイン無しのときは使わず、会話内で逐次実装する。
 ---
 
 # supa-implement — 実装フェーズの並列 Workflow(authoring)
 
 `supa-tdd` のフェーズ3を **Workflow で並列化**する。**雛形は同梱しない**。本スキルの指示で `.claude/workflows/supa-implement-workflow.js` を生成し `Workflow({ name: 'supa-implement-workflow' })` で起動する。
 
+## オーケストレーション
+
+```mermaid
+sequenceDiagram
+    participant U as ユーザー
+    participant S as supa-tdd(会話)
+    participant K as supa-implement(本スキル)
+    participant W as Workflow ツール
+    participant A as supa-implementer ×N
+    U->>S: /supa(フェーズ1〜2 を承認)
+    S->>U: 実装フェーズ。並列化する?
+    U->>S: はい(オプトイン)
+    S->>K: authoring 適用
+    K->>W: supa-implement-workflow.js を生成し起動
+    W->>A: 各モジュール: 実装 → turbo typecheck test
+    A-->>W: green / 失敗
+    W-->>S: 集約 → フェーズ4(ゲート)
+```
+
 ## 使う条件(すべて満たすとき)
 - フェーズ2まで完了(契約 + red テストが揃っている)。
 - **互いに import 依存が無く並列実装で衝突しない独立モジュールが3つ以上**。
 - **ユーザーがオプトイン**(会話側がヒューマンゲートを維持。Workflow 走行中は人間入力不可)。
-- 会話内 subagent-driven と **同時併用しない**(駆動役は択一。§4.1)。
+- 会話内 subagent-driven と **同時併用しない**(駆動役は択一)。
 
 満たさなければ Workflow 化せず、会話内で逐次実装する。
 
 ## 生成手順
-1. 未実装スタブを含む `.js/.jsx` から `args` を導く:`[{ file, testFile }, ...]`(独立モジュールのみ)。
-2. 配置スコープ(§7):install が `--scope project` なら `repo/.claude/workflows/`、既定 user なら `~/.claude/workflows/`。
+1. 未実装スタブを含む `.js/.jsx` から `args` を導く(独立モジュールのみ)。例:
+```js
+const args = [
+  { file: 'app/next-shop/src/helper/order.js',   testFile: 'app/next-shop/src/helper/order.test.js' },
+  { file: 'app/next-shop/src/helper/pricing.js', testFile: 'app/next-shop/src/helper/pricing.test.js' },
+  { file: 'package/order/src/helper/money.js',    testFile: 'package/order/src/helper/money.test.js' },
+];
+```
+2. 配置スコープ:install が `--scope project` なら `repo/.claude/workflows/`、既定 user なら `~/.claude/workflows/`。
 3. 下記スクリプトを `supa-implement-workflow.js` として書き、`Workflow({ name: 'supa-implement-workflow' })` で起動。`args` は実 JSON で渡る。
 4. 集約結果を会話へ返し、**フェーズ4(ゲート)** へ。
 
