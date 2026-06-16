@@ -2,13 +2,13 @@
   "name": "magcen-zone",
   "owner": { "name": "magcen-zone" },
   "metadata": {
-    "description": "supadevops 配布用マーケットプレイス(本社: github.com/magcen-zone)。"
+    "description": "supadevops 分发用 marketplace(总部: github.com/magcen-zone)。"
   },
   "plugins": [
     {
       "name": "supadevops",
       "source": "./",
-      "description": "JSDoc 契約優先 + TDD 開発フロー(Next.js / Expo モノレポ)。"
+      "description": "JSDoc 契约优先 + TDD 开发流程(Next.js / Expo monorepo)。"
     }
   ]
 }

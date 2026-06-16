@@ -1,101 +1,101 @@
-# supadevops 仕様 — JSDoc 契約優先 + TDD 開発フロー
+# supadevops 规约 — JSDoc 契约优先 + TDD 开发流程
 
-本仕様は、Claude Code プラグイン **supadevops** が課す開発フローを規定する。supadevops は Superpowers を補強し、Claude Code による **Next.js(App Router)/ Expo(React Native)** 開発において、実装より先に JSDoc で契約を確定させる。対象は **npm workspaces + turborepo のモノレポ**(`app/*` の各アプリ + `package/*` の共有ライブラリ群)で、`/supa-init` コマンドが各アプリを公式 CLI で初期化して中立な足場を作る(§6)。**プラグインはデプロイに中立**で、どこへ deploy するかは開発者の裁量とする(参考構成は §1.4 末尾)。契約を起点に、**単体(ヘルパー・Server Action)は test-first(red → green)、endpoint・end2end(API・UI)は実装後の受入テスト**として検証し(§2.1)、各フェーズにヒューマンゲートを課す。機能追加・バグ修正は本フローを1サイクルとして反復し、各サイクルは回帰安全(§2.2)とする。本書は2部構成:第 I 部が方法論(§1–§4)、第 II 部が supadevops プラグインの構築・配布(§5–§8)。
+本规约规定 Claude Code 插件 **supadevops** 所施加的开发流程。supadevops 增强 Superpowers，在使用 Claude Code 进行 **Next.js（App Router）/ Expo（React Native）** 开发时，先于实现用 JSDoc 确定契约。对象是 **npm workspaces + turborepo 的 monorepo**（`app/*` 下的各应用 + `package/*` 下的共享库群），`/supa-init` 命令用官方 CLI 初始化各应用以构建对部署保持中立的脚手架（§6）。**插件对部署保持中立**，deploy 到何处由开发者自行裁量（参考结构见 §1.4 末尾）。以契约为起点，**单元（辅助函数、Server Action）采用 test-first（red → green），endpoint、end2end（API、UI）作为实现后的验收测试**来验证（§2.1），并对各阶段施加人工门控。功能新增、缺陷修复以本流程为一个循环进行迭代，每个循环均为回归安全（§2.2）。本书为两部构成：第 I 部为方法论（§1–§4），第 II 部为 supadevops 插件的构建与分发（§5–§8）。
 
 ---
 
-# 第 I 部 — 開発フロー(方法論)
+# 第 I 部 — 开发流程（方法论）
 
-## 1. 前提と原則
+## 1. 前提与原则
 
 ### 1.1 前提
 
-| 項目 | 規定 |
+| 项目 | 规定 |
 |---|---|
-| 言語・型 | JavaScript + JSDoc。型はすべて JSDoc(`@typedef` / `@param` / `@returns` 等)で記す。`.d.ts` は作らない。型検査は `tsc`(出力なし) |
-| モジュール | ESM(`import` / `export`、`package.json` に `"type": "module"`) |
-| リポ形態 | **npm workspaces + turborepo のモノレポ**。root に `package.json`(`"workspaces": ["app/*", "package/*"]`)/ `package-lock.json` / `turbo.json` / `node_modules`(主に root へ hoist)。`app/*` に各アプリ、`package/*` に共有ライブラリ群(構成は §1.4) |
-| 対象 | supadevops を適用するモノレポ。`app/next-<名>`(Next.js `src/app`)と `app/expo-<名>`(Expo)を並置できる。契約・検証は全アプリ・全コードに課す(コード種別ごとの手段は §3.6、構成は §1.4)。**プラグインはデプロイに中立**(デプロイ先は開発者裁量・§1.4 末尾の参考) |
-| ディレクトリ | 各 Next.js アプリは `src/` 構成:`src/helper/`(純粋関数)/ `src/action/`(Server Action・使う場合)/ `src/component/`(コンポーネント)/ `src/type/`(共有 `@typedef`)/ `src/app/`(page・layout・`api/**/route.js`)。Expo アプリは Expo Router(`app/`)+ `src/helper` 等でロジックを分離。`package/*` の各共有ライブラリは**プラットフォーム非依存のロジック・型のみ**(§3.6)。テストは §3.4 |
-| テスト | 単体 = Jest(Expo は jest-expo)、endpoint = Playwright `request`、end2end = Playwright(web・Expo web)/ Maestro(Expo native) |
-| 文書 | Markdown + Mermaid |
-| 依存 | Superpowers に依存(同梱しない)。`plugin.json` の `dependencies` で宣言する(§8) |
+| 语言、类型 | JavaScript + JSDoc。类型全部以 JSDoc（`@typedef` / `@param` / `@returns` 等）记述。不创建 `.d.ts`。类型检查用 `tsc`（不输出） |
+| 模块 | ESM（`import` / `export`，`package.json` 中 `"type": "module"`） |
+| 仓库形态 | **npm workspaces + turborepo 的 monorepo**。root 有 `package.json`（`"workspaces": ["app/*", "package/*"]`）/ `package-lock.json` / `turbo.json` / `node_modules`（主要 hoist 到 root）。`app/*` 放各应用，`package/*` 放共享库群（结构见 §1.4） |
+| 对象 | 适用 supadevops 的 monorepo。可并置 `app/next-<名>`（Next.js `src/app`）与 `app/expo-<名>`（Expo）。契约、验证施加于全部应用、全部代码（按代码种别的手段见 §3.6，结构见 §1.4）。**插件对部署保持中立**（部署目标由开发者裁量，§1.4 末尾为参考） |
+| 目录 | 各 Next.js 应用为 `src/` 结构：`src/helper/`（纯函数）/ `src/action/`（Server Action，使用时）/ `src/component/`（组件）/ `src/type/`（共享 `@typedef`）/ `src/app/`（page、layout、`api/**/route.js`）。Expo 应用以 Expo Router（`app/`）+ `src/helper` 等分离逻辑。`package/*` 的各共享库**仅含与平台无关的逻辑、类型**（§3.6）。测试见 §3.4 |
+| 测试 | 单元 = Jest（Expo 为 jest-expo），endpoint = Playwright `request`，end2end = Playwright（web、Expo web）/ Maestro（Expo native） |
+| 文档 | Markdown + Mermaid |
+| 依赖 | 依赖 Superpowers（不内置）。在 `plugin.json` 的 `dependencies` 中声明（§8） |
 
-> 補足: 横断的な型は各アプリの `src/type/`(アプリ間で共有するなら `package/*` のライブラリ)に JS+JSDoc の `@typedef` で集約する(モジュール固有型はそのファイル内でよい)。Server Action は **`'use server'` を持つ関数/ファイル**で、`src/action/` に集約する(`src/action/` には Server Action 以外の通常モジュールを置かない)。`package/*` の共有ライブラリは Next.js(React DOM)と Expo(React Native)の双方から import されうるため、**React DOM 専用の `.jsx` コンポーネントは置かず**、framework 非依存のロジック・型・hooks・API クライアントに限る(§3.6)。root 直下の `app/`(アプリ束)は Next.js の `src/app/` や Expo Router の `app/` とは階層が異なり、`workspaces` のグロブは直下のみに一致する(衝突しない)。
+> 补充：横切类型在各应用的 `src/type/`（若跨应用共享则放 `package/*` 的库）以 JS+JSDoc 的 `@typedef` 汇总（模块固有类型放在该文件内即可）。Server Action 是**带有 `'use server'` 的函数/文件**，汇总于 `src/action/`（`src/action/` 中不放 Server Action 以外的普通模块）。`package/*` 的共享库可能被 Next.js（React DOM）与 Expo（React Native）双方 import，因此**不放 React DOM 专用的 `.jsx` 组件**，仅限 framework 无关的逻辑、类型、hooks、API 客户端（§3.6）。root 直下的 `app/`（应用束）与 Next.js 的 `src/app/` 或 Expo Router 的 `app/` 层级不同，`workspaces` 的 glob 仅匹配直下（不会冲突）。
 
-### 1.2 設計原則
+### 1.2 设计原则
 
-1. **契約優先** — 実装より先に JSDoc 契約を確定する。
-2. **多層・詳細な JSDoc** — module / class / function / method / component props / `@typedef` の各層に `@param` / `@returns` / `@throws` と意図を記す。実装はこの契約に収束させる。
-3. **Plan は実ファイルを直接生成する** — 別の manifest を持たない。フェーズ1で対象 `.js / .jsx`(ヘルパー等の `.js` とコンポーネントの `.jsx`)に契約と構造プレースホルダを直接記す。位置はファイル内順序(§3.1)で定め、行番号に依存しない。
-4. **粒度はモジュール単位** — 契約・テスト・実装はモジュール(`.js / .jsx`)単位でまとめて行い、関数単位で刻まない。
-5. **進捗は実ファイルに現れる** — 未実装は `throw` スタブで表す。進捗を別ファイルで二重管理しない。
-6. **ヒューマンゲート** — 前フェーズが承認されるまで次へ進まない。
-7. **Superpowers を補強する** — できることは再実装せず直接使う(§4)。
+1. **契约优先** — 先于实现确定 JSDoc 契约。
+2. **多层、详细的 JSDoc** — 在 module / class / function / method / component props / `@typedef` 各层记述 `@param` / `@returns` / `@throws` 与意图。实现向此契约收敛。
+3. **Plan 直接生成真实文件** — 不持有另外的 manifest。在阶段1向目标 `.js / .jsx`（辅助函数等的 `.js` 与组件的 `.jsx`）直接记入契约与结构占位符。位置以文件内顺序（§3.1）确定，不依赖行号。
+4. **粒度为模块单位** — 契约、测试、实现以模块（`.js / .jsx`）为单位整体进行，不按函数单位切分。
+5. **进度体现在真实文件中** — 未实现以 `throw` 桩表示。不在另外的文件中重复管理进度。
+6. **人工门控** — 在前一阶段被批准之前不进入下一阶段。
+7. **增强 Superpowers** — 能做到的事不重新实现，直接使用（§4）。
 
-### 1.3 用語
+### 1.3 术语
 
-- **契約** — JSDoc による型(`@param` / `@returns` / `@typedef` 等)と一行の意図(振る舞い)。module / class / function / component props の各層に記す。
-- **スタブ** — 契約のみを持ち、本体が `throw new Error('not implemented')` の宣言。
-- **規律** — supa が課す JS+JSDoc 固有の規則(契約優先・`tsc`/`jest` 検証・配置規約)。
-- **回帰安全** — サイクルの完了条件「全テスト + 型検査が緑」により、以前緑だった挙動が壊れない性質(§2.2)。
-- **ヘルパー** — UI / Route Handler から抽出した純粋関数(framework 非依存・決定的)。`src/helper/` に置き、Jest 単体でテストする。
-- **Route Handler** — `src/app/api/**/route.js`。共通・外部サービスを呼ぶ薄い API 境界(BFF)。endpoint で検証する。
-- **Server Action** — `'use server'` を持つ関数。React のフォーム/クライアントから呼ぶ **UI のミューテーション手段**で、**UI(フォーム)を持つ next アプリにのみ存在する**(使うかは任意。既定の変更系統は Route Handler)。`src/action/` に集約し、関数として Jest(共通・外部サービスの HTTP は MSW で mock)で検証する(純粋部はヘルパーへ抽出)。
-- **共通サービス** — 自社で共有する**内部**サービス(= §1.4 参考の middle office)。Route Handler(BFF)が代理して呼ぶ。テストでは stub で差し替える(endpoint は env で stub、Server Action は MSW)。実体・配置・デプロイはプラグインの関与外(開発者裁量。参考は §1.4 末尾)。
-- **外部サービス** — **第三者**の外部サービス。Route Handler / Server Action が呼ぶ。テストでは stub / mock で差し替える。本書で「共通・外部サービス」と併記する箇所は両者を指す。
-- **モノレポ** — npm workspaces + turborepo で複数アプリ(`app/*`)と共有ライブラリ群(`package/*`)を1リポに束ねた構成(§1.4)。turbo がタスク(build / dev / lint / typecheck / test)をワークスペース横断で実行・キャッシュする。
-- **Expo アプリ** — Expo(React Native)製のアプリ(`app/expo-<名>`)。1コードベースから **native**(iOS / Android)と **web**(`expo export -p web`。`web.output` で SPA / SSG)の build 出力を得る(deploy 先はプラグイン非関与)。
-- **endpoint** — Route Handler(API)を Playwright `request` で検証するテスト(ブラウザ無し・共通・外部サービスは dev サーバで stub)。配置は §3.4。
-- **end2end** — UI / ブラウザ・画面フローを検証するテスト(web・Expo web は Playwright、Expo native は Maestro)。配置は §3.4。
-- **red / green** — テストが失敗 / 成功する状態(TDD)。
-- **断言(assertion)** — 期待結果を検証する文(`expect(...)` 等)。
-- **駆動役** — 実装を進める主体。会話内 subagent または supadevops の Workflow(§4.1)。
-- **Workflow** — Claude Code の本体機能。JS スクリプトで subagent を並列/逐次実行する。supadevops の `supa-<機能>-workflow.js` はこの Workflow スクリプト(§5)。
+- **契约** — 由 JSDoc 给出的类型（`@param` / `@returns` / `@typedef` 等）与一行意图（行为）。记于 module / class / function / component props 各层。
+- **桩** — 仅持有契约、本体为 `throw new Error('not implemented')` 的声明。
+- **纪律** — supa 所施加的 JS+JSDoc 固有规则（契约优先、`tsc`/`jest` 验证、放置规约）。
+- **回归安全** — 由循环的完成条件“全部测试 + 类型检查为绿”所保证、以前为绿的行为不会被破坏的性质（§2.2）。
+- **辅助函数** — 从 UI / Route Handler 提取的纯函数（framework 无关、确定性）。放于 `src/helper/`，以 Jest 单元测试。
+- **Route Handler** — `src/app/api/**/route.js`。调用公共服务、外部服务的轻薄 API 边界（BFF）。以 endpoint 验证。
+- **Server Action** — 带有 `'use server'` 的函数。从 React 的表单/客户端调用的 **UI 变更手段**，**仅存在于持有 UI（表单）的 next 应用中**（是否使用为可选。默认的变更系统是 Route Handler）。汇总于 `src/action/`，作为函数以 Jest（公共服务、外部服务的 HTTP 用 MSW mock）验证（纯粹部分提取到辅助函数）。
+- **公共服务** — 自有内部共享的**内部**服务（= §1.4 参考的 middle office）。由 Route Handler（BFF）代理调用。测试中以 stub 替换（endpoint 用 env stub，Server Action 用 MSW）。实体、放置、部署不在插件关注范围（开发者裁量。参考见 §1.4 末尾）。
+- **外部服务** — **第三方**的外部服务。由 Route Handler / Server Action 调用。测试中以 stub / mock 替换。本书中并记“公共服务、外部服务”的地方指二者。
+- **monorepo** — 用 npm workspaces + turborepo 将多个应用（`app/*`）与共享库群（`package/*`）束于一仓库的结构（§1.4）。turbo 跨工作区执行并缓存任务（build / dev / lint / typecheck / test）。
+- **Expo 应用** — Expo（React Native）制的应用（`app/expo-<名>`）。从一份代码库获得 **native**（iOS / Android）与 **web**（`expo export -p web`。以 `web.output` 得 SPA / SSG）的 build 输出（deploy 目标插件不关注）。
+- **endpoint** — 用 Playwright `request` 验证 Route Handler（API）的测试（无浏览器，公共服务、外部服务在 dev 服务器上 stub）。放置见 §3.4。
+- **end2end** — 验证 UI / 浏览器、画面流程的测试（web、Expo web 用 Playwright，Expo native 用 Maestro）。放置见 §3.4。
+- **red / green** — 测试失败 / 成功的状态（TDD）。
+- **断言（assertion）** — 验证期望结果的语句（`expect(...)` 等）。
+- **驱动角色** — 推进实现的主体。会话内 subagent 或 supadevops 的 Workflow（§4.1）。
+- **Workflow** — Claude Code 的本体功能。以 JS 脚本并行/串行执行 subagent。supadevops 的 `supa-<功能>-workflow.js` 即此 Workflow 脚本（§5）。
 
-### 1.4 対象モノレポの構成
+### 1.4 对象 monorepo 的结构
 
-supadevops は **npm workspaces + turborepo のモノレポ**単位で適用する。1モノレポは複数アプリ(`app/*`)と共有ライブラリ群(`package/*`)を束ね、`/supa-init`(§6)が公式 CLI と npm 命令で各アプリを初期化して**中立な足場**を作る。**プラグインはデプロイに中立**で、デプロイ先・ネットワーク・サービス間認証・アプリの役割区分には関与しない(それらは開発者裁量。本社の参考構成は本節末尾)。
+supadevops 以 **npm workspaces + turborepo 的 monorepo** 为单位适用。一个 monorepo 束起多个应用（`app/*`）与共享库群（`package/*`），`/supa-init`（§6）用官方 CLI 与 npm 命令初始化各应用以构建**对部署保持中立的脚手架**。**插件对部署保持中立**，不关注部署目标、网络、服务间认证、应用的角色划分（这些由开发者裁量。本社的参考结构见本节末尾）。
 
-#### モノレポの構成(規範)
+#### monorepo 的结构（规范）
 
-- root は npm workspaces(`"workspaces": ["app/*", "package/*"]`)+ turborepo。`turbo.json` が build / dev / lint / typecheck / test をワークスペース横断で実行・キャッシュする。
-- `app/*` に各アプリを置く。`app/next-<名>`(Next.js `src/app`)・`app/expo-<名>`(Expo)を並置でき、必要に応じて複数置く(API 専用の next も同列。プラグインは役割を区別しない)。
-- `package/*` に共有ライブラリ群を置く(1つに限らない)。各ライブラリは **プラットフォーム非依存のロジック・型のみ**(helper / type / hooks / API クライアント)。Next.js(React DOM)と Expo(React Native)双方から import されうるため React DOM 専用 `.jsx` は置かない(§3.6)。
-- 各アプリ・各ライブラリは自分の `package.json`(自分の依存のみ)・`jsconfig.json`(§3.5)を持ち、内部は §1.1 のディレクトリ規約に従う。`package.json` / `package-lock.json` / `node_modules` は **npm が生成**する(手書きしない)。`node_modules` は主に root へ hoist。
-- build / export(dev・テスト用):Expo native は `expo prebuild` + `expo run:ios` / `run:android`(ローカルビルド)、Expo web は `expo export -p web`(`app.json` の `web.output` で `single`=SPA / `static`=SSG。`server`〔SSR/API routes〕は現状スコープ外〔将来対応。`src/endpoint/`・`src/action/` を予約〕)、Next.js は `next build`。**成果物をどこへ deploy するかはプラグイン非関与**。
+- root 为 npm workspaces（`"workspaces": ["app/*", "package/*"]`）+ turborepo。`turbo.json` 跨工作区执行并缓存 build / dev / lint / typecheck / test。
+- `app/*` 放各应用。可并置 `app/next-<名>`（Next.js `src/app`）、`app/expo-<名>`（Expo），并按需放多个（API 专用的 next 也同列。插件不区分角色）。
+- `package/*` 放共享库群（不限于一个）。各库**仅含与平台无关的逻辑、类型**（helper / type / hooks / API 客户端）。由于可能被 Next.js（React DOM）与 Expo（React Native）双方 import，故不放 React DOM 专用 `.jsx`（§3.6）。
+- 各应用、各库持有自己的 `package.json`（仅自己的依赖）、`jsconfig.json`（§3.5），内部遵循 §1.1 的目录规约。`package.json` / `package-lock.json` / `node_modules` 由 **npm 生成**（不手写）。`node_modules` 主要 hoist 到 root。
+- build / export（dev、测试用）：Expo native 用 `expo prebuild` + `expo run:ios` / `run:android`（本地构建），Expo web 用 `expo export -p web`（以 `app.json` 的 `web.output` 选 `single`=SPA / `static`=SSG。`server`〔SSR/API routes〕现状超出范围〔将来支持。预留 `src/endpoint/`、`src/action/`〕），Next.js 用 `next build`。**成果物 deploy 到何处插件不关注**。
 
 ```
-<repo>/                            # モノレポ（npm workspaces + turborepo）
+<repo>/                            # monorepo（npm workspaces + turborepo）
 ├─ package.json                    # "type":"module", "workspaces":["app/*","package/*"]
-├─ package-lock.json               # npm が生成
-├─ node_modules/                   # hoisted（主に root）
-├─ turbo.json                      # build/dev/lint/typecheck/test のタスクパイプライン
+├─ package-lock.json               # npm 生成
+├─ node_modules/                   # hoisted（主要在 root）
+├─ turbo.json                      # build/dev/lint/typecheck/test 的任务管线
 ├─ app/
-│  ├─ next-shop/                   # create-next-app（JS・src/app）
+│  ├─ next-shop/                   # create-next-app（JS、src/app）
 │  │  ├─ package.json
-│  │  ├─ next.config.js            # transpilePackages: package/* を取り込む（§3.7）
+│  │  ├─ next.config.js            # transpilePackages: 取入 package/*（§3.7）
 │  │  ├─ jsconfig.json             # checkJs + types:["node"]（§3.5）
 │  │  └─ src/
 │  │     ├─ helper/ action/ component/ type/
-│  │     ├─ app/                   # page・layout・api/**/route.js
+│  │     ├─ app/                   # page、layout、api/**/route.js
 │  │     ├─ endpoint/              # endpoint（Playwright request）
-│  │     └─ end2end/               # end2end（web・Playwright）
+│  │     └─ end2end/               # end2end（web、Playwright）
 │  └─ expo-shop/                   # create-expo-app（既定 TS→JS+JSDoc 化）
 │     ├─ package.json
-│     ├─ app.json                  # web.output: single | static（将来 server も）
-│     ├─ metro.config.cjs          # CJS（type:module のため）
+│     ├─ app.json                  # web.output: single | static（将来也含 server）
+│     ├─ metro.config.cjs          # CJS（因 type:module）
 │     ├─ babel.config.cjs          # CJS
 │     ├─ jsconfig.json
-│     └─ src/                      # Next と同形（endpoint/ action/ は将来 SSR 用に予約）
+│     └─ src/                      # 与 Next 同形（endpoint/ action/ 为将来 SSR 预留）
 │        ├─ helper/ action/ component/ type/
 │        ├─ app/                   # Expo Router 画面（src/app）
-│        ├─ endpoint/              # 将来 SSR（web.output:'server'）の API routes 用
+│        ├─ endpoint/              # 将来 SSR（web.output:'server'）的 API routes 用
 │        └─ end2end/
 │           ├─ web/                # Playwright
 │           └─ native/             # Maestro（*.yaml）
-└─ package/                        # 共有ライブラリ群（複数可）
-   ├─ order/                       # 例: プラットフォーム非依存ロジック・型
+└─ package/                        # 共享库群（可多个）
+   ├─ order/                       # 例: 平台无关逻辑、类型
    │  ├─ package.json
    │  └─ src/
    │     ├─ helper/
@@ -104,29 +104,29 @@ supadevops は **npm workspaces + turborepo のモノレポ**単位で適用す�
       └─ …（同構成）
 ```
 
-#### 参考: デプロイと層構成(非規範・開発者裁量・プラグイン非関与)
+#### 参考：部署与分层结构（非规范、开发者裁量、插件不关注）
 
-> 以下は supadevops の規範ではない。デプロイ先・ネットワーク・ingress・IAM・アプリの役割区分(製品 / 共有サービス)は開発者の運用裁量であり、プラグインは中立で関与しない。本社の構成例として参考に記す(プラットフォームの最終挙動は Google Cloud / Firebase / Expo 公式文書を正とする。EAS / Vercel は本社では用いない)。
+> 以下不是 supadevops 的规范。部署目标、网络、ingress、IAM、应用的角色划分（产品 / 共享服务）属于开发者的运维裁量，插件保持中立、不关注。作为本社的结构示例供参考（平台的最终行为以 Google Cloud / Firebase / Expo 官方文档为准。EAS / Vercel 本社不使用）。
 
-本社では同一モノレポのアプリを役割で 3 層に捉える:**front office**(ユーザー向け UI。`app/next-<名>` の page/layout・`src/component`、および `app/expo-<名>`)/ **back office**(同じ製品の Route Handler `app/next-<名>/src/app/api/**/route.js`)/ **middle office**(複数製品から再利用される共有 API。別リポの同形状モノレポに `app/next-<svc>` を並置)。ブラウザ・モバイルは front / back office とのみ通信し、middle office へは back office がサーバ間で代理する(外部公開しない)。
+本社将同一 monorepo 的应用按角色看作 3 层：**front office**（面向用户的 UI。`app/next-<名>` 的 page/layout、`src/component`，以及 `app/expo-<名>`）/ **back office**（同一产品的 Route Handler `app/next-<名>/src/app/api/**/route.js`）/ **middle office**（被多个产品复用的共享 API。在另一仓库的同形状 monorepo 中并置 `app/next-<svc>`）。浏览器、移动端仅与 front / back office 通信，对 middle office 由 back office 在服务器间代理（不对外公开）。
 
-| アプリ(例) | 役割 | デプロイ先(例) | ビルド | ingress |
+| 应用（例） | 角色 | 部署目标（例） | 构建 | ingress |
 |---|---|---|---|---|
-| `app/next-<名>`(製品 front+back) | UI + BFF | Firebase **App Hosting** または raw **Cloud Run** | Cloud Build / buildpacks | 公開 + CDN |
-| `app/expo-<名>`(native) | iOS / Android | **ローカル macOS ビルド**(Xcode / Android SDK) | ローカル | 端末(配布は手動 / ストア) |
-| `app/expo-<名>`(web) | SPA / SSG | Firebase **Hosting** | `expo export -p web` → `dist/` | 公開 |
-| `app/next-<svc>`(middle office) | 共有 API | raw **Cloud Run** | buildpacks | internal |
+| `app/next-<名>`（产品 front+back） | UI + BFF | Firebase **App Hosting** 或 raw **Cloud Run** | Cloud Build / buildpacks | 公开 + CDN |
+| `app/expo-<名>`（native） | iOS / Android | **本地 macOS 构建**（Xcode / Android SDK） | 本地 | 设备（分发为手动 / 商店） |
+| `app/expo-<名>`（web） | SPA / SSG | Firebase **Hosting** | `expo export -p web` → `dist/` | 公开 |
+| `app/next-<svc>`（middle office） | 共享 API | raw **Cloud Run** | buildpacks | internal |
 
 ```mermaid
 flowchart TB
-    Browser["ブラウザ / Expo web（iPhone Safari / PWA）"]
-    Mobile["Expo native（ローカルビルド）"]
-    subgraph Hosting["Firebase Hosting（静的）"]
-      EW["製品A Expo web（SPA / SSG）"]
+    Browser["浏览器 / Expo web（iPhone Safari / PWA）"]
+    Mobile["Expo native（本地构建）"]
+    subgraph Hosting["Firebase Hosting（静态）"]
+      EW["产品A Expo web（SPA / SSG）"]
     end
-    subgraph AppHosting["App Hosting / Cloud Run（製品 front+back）"]
-      P1["製品A（next: front + back office）"]
-      P2["製品B（next: front + back office）"]
+    subgraph AppHosting["App Hosting / Cloud Run（产品 front+back）"]
+      P1["产品A（next: front + back office）"]
+      P2["产品B（next: front + back office）"]
     end
     subgraph CloudRun["raw Cloud Run（middle office / internal）"]
       S1["user-center"]
@@ -157,115 +157,115 @@ flowchart TB
     style Hosting fill:#db6d2814,stroke:#f0883e,stroke-width:1px;
 ```
 
-デプロイ手順(参考):
+部署步骤（参考）：
 
-- **製品 next → App Hosting / Cloud Run** — App Hosting のバックエンド作成時に **Root directory を `app/next-<名>`** に向ける(モノレポ対応。workspace 依存 `package/*` も同時にビルド)。以後 `git push` で Cloud Build → buildpacks → Cloud Run → CDN。実行時設定は `app/next-<名>/apphosting.yaml` の `runConfig`。Cloud Run へ直接出すなら `gcloud run deploy <名> --source app/next-<名> --region <region>`。
-- **Expo native → ローカル macOS ビルド** — `app/expo-<名>` で `expo prebuild` 後 `expo run:ios`(Xcode)/ `run:android`(Android SDK)。配布は手動(TestFlight / ストア / 内部)。
-- **Expo web → Firebase Hosting** — `expo export -p web` で `dist/` を生成し `firebase deploy --only hosting`(`firebase.json` の `hosting.public` を `dist/` に向け、SPA は rewrites で index へフォールバック)。
-- **middle office next → raw Cloud Run** — `gcloud run deploy <svc> --source app/next-<svc> --region <region> --ingress internal --no-allow-unauthenticated`。`next.config` は `output: 'standalone'`。sidecar が要れば `service.yaml` + `gcloud run services replace`(App Hosting は sidecar 非対応)。
+- **产品 next → App Hosting / Cloud Run** — 创建 App Hosting 后端时将 **Root directory 指向 `app/next-<名>`**（monorepo 支持。workspace 依赖 `package/*` 也一并构建）。此后 `git push` 即 Cloud Build → buildpacks → Cloud Run → CDN。运行时配置在 `app/next-<名>/apphosting.yaml` 的 `runConfig`。若直接发到 Cloud Run 则用 `gcloud run deploy <名> --source app/next-<名> --region <region>`。
+- **Expo native → 本地 macOS 构建** — 在 `app/expo-<名>` 执行 `expo prebuild` 后 `expo run:ios`（Xcode）/ `run:android`（Android SDK）。分发为手动（TestFlight / 商店 / 内部）。
+- **Expo web → Firebase Hosting** — 用 `expo export -p web` 生成 `dist/` 后 `firebase deploy --only hosting`（将 `firebase.json` 的 `hosting.public` 指向 `dist/`，SPA 用 rewrites 回退到 index）。
+- **middle office next → raw Cloud Run** — `gcloud run deploy <svc> --source app/next-<svc> --region <region> --ingress internal --no-allow-unauthenticated`。`next.config` 为 `output: 'standalone'`。若需要 sidecar 则用 `service.yaml` + `gcloud run services replace`（App Hosting 不支持 sidecar）。
 
-設定・認証(参考):
+配置、认证（参考）：
 
-- 設定ファイル `apphosting.yaml` / `service.yaml` / `firebase.json` は拡張子(`.yml` / `.yaml` / `.json`)を保ちつつ中身を JSON 構文で記す(YAML は JSON のスーパーセット)。
-- middle office は ingress internal とし、back office からの呼び出しはサービスアカウント + ID token(IAM・Cloud Run ネイティブ service-to-service)で認証する。
+- 配置文件 `apphosting.yaml` / `service.yaml` / `firebase.json` 在保持扩展名（`.yml` / `.yaml` / `.json`）的同时以 JSON 语法记述内容（YAML 是 JSON 的超集）。
+- middle office 设为 ingress internal，来自 back office 的调用以服务账号 + ID token（IAM、Cloud Run 原生 service-to-service）认证。
 
-> テストとの対応: 「Route Handler / Server Action が共通・外部サービスを呼ぶ箇所はテストで差し替える」(§3.6)。endpoint は env で stub、Server Action は MSW。
+> 与测试的对应：“Route Handler / Server Action 调用公共服务、外部服务的地方在测试中替换”（§3.6）。endpoint 用 env stub，Server Action 用 MSW。
 
 ---
 
-## 2. 開発フロー(5フェーズ)
+## 2. 开发流程（5阶段）
 
-実 `.js / .jsx` に契約を先に記し、テストと実装をそこへ収束させる。順序を飛ばさない。
+先在真实 `.js / .jsx` 记入契约，让测试与实现向其收敛。不跳过顺序。
 
 ```mermaid
 flowchart TD
-    R["要件"] --> P1["フェーズ1 Plan(契約)<br/>.js/.jsx に多層JSDoc + 構造プレースホルダ + tsc検証"]
-    P1 -->|🚧 承認| P2["フェーズ2 Test<br/>it.todo→🚧承認→断言(red)"]
-    P2 --> P3["フェーズ3 Implement<br/>スタブ実装(green)・jest+tsc"]
-    P3 --> P4["フェーズ4 endpoint・end2end(受入)<br/>Playwright / Maestro・実装後"]
-    P4 --> P5["フェーズ5 Finish<br/>レビュー"]
+    R["要件"] --> P1["阶段1 Plan(契约)<br/>在 .js/.jsx 写多层JSDoc + 结构占位 + tsc验证"]
+    P1 -->|🚧 批准| P2["阶段2 Test<br/>it.todo→🚧批准→断言(red)"]
+    P2 --> P3["阶段3 Implement<br/>桩实现(green)、jest+tsc"]
+    P3 --> P4["阶段4 endpoint、end2end(验收)<br/>Playwright / Maestro、实现后"]
+    P4 --> P5["阶段5 Finish<br/>评审"]
 ```
 
-| フェーズ | 作業 | ゲート |
+| 阶段 | 工作 | 门控 |
 |---|---|---|
-| **1 Plan(契約)** | 対象 `.js / .jsx`(ヘルパー等の `.js` とコンポーネントの `.jsx`)を作成し、多層 JSDoc(module / class / function / method / component props / `@typedef`)と構造プレースホルダ(本体は `throw new Error('not implemented')`)を直接記入する。`tsc -p jsconfig.json --noEmit` で型契約を検証する | 🚧 承認 |
-| **2 Test(red)** | JSDoc 契約に対し Jest を記述する。`it.todo` で検証項目を列挙 → 🚧承認 → 断言を埋めて **red** にする(§3.3) | 🚧 承認(it.todo) |
-| **3 Implement(green)** | スタブ本体をモジュール単位で実装し、`jest` と `tsc` を緑にする(並列加速は §5) | — |
-| **4 受入(endpoint・end2end)** | endpoint と end2end を**受入テスト**として追加する(実装後)。endpoint は全 Route Handler に Playwright `request`(共通・外部サービスは env で stub した dev サーバ)。end2end は全 next ルート(page/layout)と Expo の全画面に課す:web・Expo web は Playwright、Expo native は Maestro(§3.6) | — |
-| **5 Finish** | レビューし、未実装スタブが残っていないことを確認する | — |
+| **1 Plan（契约）** | 创建目标 `.js / .jsx`（辅助函数等的 `.js` 与组件的 `.jsx`），直接记入多层 JSDoc（module / class / function / method / component props / `@typedef`）与结构占位符（本体为 `throw new Error('not implemented')`）。用 `tsc -p jsconfig.json --noEmit` 验证类型契约 | 🚧 批准 |
+| **2 Test（red）** | 针对 JSDoc 契约编写 Jest。用 `it.todo` 列举验证项 → 🚧批准 → 填入断言使其变为 **red**（§3.3） | 🚧 批准（it.todo） |
+| **3 Implement（green）** | 以模块为单位实现桩本体，使 `jest` 与 `tsc` 变绿（并行加速见 §5） | — |
+| **4 验收（endpoint、end2end）** | 将 endpoint 与 end2end 作为**验收测试**追加（实现后）。endpoint 对全部 Route Handler 用 Playwright `request`（公共服务、外部服务用 env stub 的 dev 服务器）。end2end 施加于全部 next 路由（page/layout）与 Expo 的全部画面：web、Expo web 用 Playwright，Expo native 用 Maestro（§3.6） | — |
+| **5 Finish** | 进行评审，确认未实现桩没有残留 | — |
 
-### 2.1 契約の検証
+### 2.1 契约的验证
 
-契約は3系統で検証する:型(`tsc`)・振る舞い(Jest:ヘルパー・Server Action・Expo ロジック・共有ライブラリ)・外部受入(endpoint・end2end)。フェーズ2の Jest は型ではなく振る舞いを検証する。
+契约以 3 个系统验证：类型（`tsc`）、行为（Jest：辅助函数、Server Action、Expo 逻辑、共享库）、外部验收（endpoint、end2end）。阶段2 的 Jest 验证的是行为而非类型。
 
-| 契約 | 中身 | 検証手段 | タイミング |
+| 契约 | 内容 | 验证手段 | 时机 |
 |---|---|---|---|
-| **型の契約** | JSDoc シグネチャ(`@param` / `@returns` / `@typedef`) | `tsc -p jsconfig.json --noEmit` | フェーズ1 直後から常時(静的) |
-| **振る舞いの契約** | 意図(関数 / メソッドが何をするか) | Jest | フェーズ2で **red**、フェーズ3で **green** |
-| **外部受入** | API / UI の外形的振る舞い | endpoint・end2end(Playwright / Maestro) | フェーズ4(実装後の受入) |
+| **类型契约** | JSDoc 签名（`@param` / `@returns` / `@typedef`） | `tsc -p jsconfig.json --noEmit` | 阶段1 之后起常时（静态） |
+| **行为契约** | 意图（函数 / 方法做什么） | Jest | 阶段2 为 **red**，阶段3 为 **green** |
+| **外部验收** | API / UI 的外形行为 | endpoint、end2end（Playwright / Maestro） | 阶段4（实现后的验收） |
 
-- Jest はヘルパーを import し、契約の `@param` 型に沿う入力(型付き fixtures)で呼び `@returns` と意図を assert する。Server Action は共通・外部サービスへの HTTP を MSW で mock して呼び、結果を assert する(§3.6)。Expo のロジックは jest-expo で同様に検証する。
-- 実装前はスタブが `throw` するため red、実装後 green とする。
-- テストは契約のインターフェースに対して記し、実装は契約を満たす。
-- **test-first は Jest 対象(ヘルパー・Server Action・Expo ロジック・共有ライブラリ)に限る**(endpoint・end2end は実装後の受入)。型契約(`tsc`)は全コードで常時。
+- Jest import 辅助函数，以符合契约 `@param` 类型的输入（带类型的 fixtures）调用，并 assert `@returns` 与意图。Server Action 将公共服务、外部服务的 HTTP 用 MSW mock 后调用，assert 结果（§3.6）。Expo 的逻辑以 jest-expo 同样验证。
+- 实现前因桩会 `throw` 而为 red，实现后为 green。
+- 测试针对契约的接口编写，实现满足契约。
+- **test-first 仅限 Jest 对象（辅助函数、Server Action、Expo 逻辑、共享库）**（endpoint、end2end 为实现后的验收）。类型契约（`tsc`）对全部代码常时。
 
-### 2.2 反復サイクル(機能追加・バグ修正)
+### 2.2 迭代循环（功能新增、缺陷修复）
 
-機能請求・バグ修正ごとにフロー全体を1サイクル回す。サイクルの完了条件は「全テスト + 型検査が緑」とし、以前緑だった挙動を壊さない(回帰安全)。
+每个功能请求、缺陷修复都将整个流程跑一个循环。循环的完成条件为“全部测试 + 类型检查为绿”，不破坏以前为绿的行为（回归安全）。
 
 ```mermaid
 flowchart TD
-    REQ["機能請求 / バグ報告"] --> K{"新規 or 既存?"}
-    K -->|新機能| NEW["フェーズ1<br/>新シンボルの JSDoc契約 + スタブ"]
-    K -->|バグ修正| FIX["フェーズ1<br/>既存契約を確認/補強<br/>(穴があれば JSDoc を直す)"]
-    NEW --> T["フェーズ2<br/>red テスト"]
-    FIX --> T2["フェーズ2<br/>バグを再現する red テスト"]
-    T --> IMP["フェーズ3<br/>実装 green"]
+    REQ["功能请求 / 缺陷报告"] --> K{"新增 or 既有?"}
+    K -->|新功能| NEW["阶段1<br/>新符号的 JSDoc契约 + 桩"]
+    K -->|缺陷修复| FIX["阶段1<br/>确认/增强既有契约<br/>(若有缺口则修正 JSDoc)"]
+    NEW --> T["阶段2<br/>red 测试"]
+    FIX --> T2["阶段2<br/>复现缺陷的 red 测试"]
+    T --> IMP["阶段3<br/>实现 green"]
     T2 --> IMP
-    IMP --> REG["フェーズ4-5<br/>全 jest + tsc + endpoint + end2end で回帰確認"]
+    IMP --> REG["阶段4-5<br/>全 jest + tsc + endpoint + end2end 做回归确认"]
     REG --> REQ
 ```
 
-- **新機能** — 新シンボルの契約 → red → green → 回帰確認。
-- **バグ修正** — 既存契約を確認し(不足なら JSDoc を補強)、バグを再現する red を加え、修正して green、回帰確認。
-- テストは破棄せず回帰スイートとして蓄積し、毎サイクル全実行する。
-- 回帰安全は次で担保する:
-  - 完了前に `turbo run typecheck test`(全ワークスペースの `tsc -p jsconfig.json --noEmit` + `jest`〔jest-expo 含む〕)を緑にする(`Stop` フックが自動確認。§6)。endpoint・end2end(Playwright / Maestro)は重く非対話のため Stop には含めず、フェーズ4 受入(+任意で CI)で実行する。
-  - 修正したバグは red→green テストとして恒久化し、再発を防ぐ。
+- **新功能** — 新符号的契约 → red → green → 回归确认。
+- **缺陷修复** — 确认既有契约（若不足则增强 JSDoc），加入复现缺陷的 red，修复后 green，回归确认。
+- 测试不丢弃，作为回归套件累积，每个循环全量执行。
+- 回归安全由下列保证：
+  - 在完成前使 `turbo run typecheck test`（全工作区的 `tsc -p jsconfig.json --noEmit` + `jest`〔含 jest-expo〕）变绿（`Stop` 钩子自动确认。§6）。endpoint、end2end（Playwright / Maestro）较重且非交互，故不纳入 Stop，在阶段4 验收（+可选的 CI）中执行。
+  - 修复的缺陷以 red→green 测试恒久化，防止复发。
 
 ---
 
-## 3. 規約
+## 3. 规约
 
-### 3.1 ファイル内の標準順序
+### 3.1 文件内的标准顺序
 
 ```
 1. // @ts-check
 2. import
 3. @typedef
-4. export 関数 / class(依存順 / 宣言順)
-5. 非公開 helper(末尾、または最初の使用箇所の直下)
+4. export 函数 / class(依赖顺 / 声明顺)
+5. 非公开 helper(末尾，或最初使用处的正下方)
 ```
 
-`.jsx` も同順序とする(コンポーネントは props 型付き JSDoc を持つ export 関数として `4.` に置く)。`5.` の非公開 helper は本番コードであり、テストではない。テストは別ファイルに置く(§3.4)。
+`.jsx` 也为同顺序（组件作为带 props 类型 JSDoc 的 export 函数置于 `4.`）。`5.` 的非公开 helper 是生产代码，不是测试。测试放在另外的文件（§3.4）。
 
-**説明は JSDoc(`/** ... */`)のみで記し、必ず対象コードの直上の行に置く(同行末尾には書かない)。** コードの挙動を説明する行内コメント(`//`)は書かない。例外は機械的ディレクティブ(`// @ts-check`・`'use server'` / `'use client'`)のみ。
+**说明仅以 JSDoc（`/** ... */`）记述，且必须置于对象代码正上方的行（不写在同行末尾）。** 不写说明代码行为的行内注释（`//`）。例外仅为机械式指令（`// @ts-check`、`'use server'` / `'use client'`）。
 
-### 3.2 契約の記述(フェーズ1 の出力)
+### 3.2 契约的记述（阶段1 的输出）
 
-実 `.js / .jsx` に ESM で契約とスタブを直接記す(ヘルパー等は `.js`、React コンポーネントは `.jsx`。コンポーネントは props を JSDoc で型付け、§3.6)。各 `@param` / `@returns` / `@throws` と意図を記し、スタブ本体は `throw new Error('not implemented')` とする。
+在真实 `.js / .jsx` 以 ESM 直接记入契约与桩（辅助函数等为 `.js`，React 组件为 `.jsx`。组件以 JSDoc 为 props 标注类型，§3.6）。记述各 `@param` / `@returns` / `@throws` 与意图，桩本体为 `throw new Error('not implemented')`。
 
 ```js
 // @ts-check
 
 /**
- * 注文の金額計算・検証ヘルパー(純粋関数)。
+ * 订单的金额计算、验证辅助函数(纯函数)。
  * @module helper/order
  */
 
 /**
  * @typedef {object} OrderItem
- * @property {string} sku - 商品コード
+ * @property {string} sku - 商品代码
  * @property {number} qty - 数量(>=1)
  */
 
@@ -273,22 +273,22 @@ flowchart TD
  * @typedef {object} Order
  * @property {string} id
  * @property {OrderItem[]} items
- * @property {number} total - 合計金額(税込)
+ * @property {number} total - 合计金额(含税)
  * @property {'pending'|'paid'|'cancelled'} status
  */
 
 /**
- * 明細から新規注文を組み立てる(純粋。永続化はしない)。
- * @param {OrderItem[]} items - 1件以上の明細
- * @returns {Order} status='pending' の新規注文
- * @throws {RangeError} items が空のとき
+ * 从明细组装新订单(纯粹。不做持久化)。
+ * @param {OrderItem[]} items - 1 条以上的明细
+ * @returns {Order} status='pending' 的新订单
+ * @throws {RangeError} 当 items 为空时
  */
 export function buildOrder(items) {
   throw new Error('not implemented');
 }
 
 /**
- * 明細を保持し合計を計算する純粋な集約(I/O を持たない)。
+ * 保持明细并计算合计的纯粹聚合(不持有 I/O)。
  */
 export class Cart {
   /**
@@ -299,7 +299,7 @@ export class Cart {
   }
 
   /**
-   * 合計金額(税込)を返す。
+   * 返回合计金额(含税)。
    * @returns {number}
    */
   total() {
@@ -308,7 +308,7 @@ export class Cart {
 }
 
 /**
- * 明細が妥当か判定する(内部 helper・純粋。テストではない)。
+ * 判定明细是否妥当(内部 helper、纯粹。不是测试)。
  * @param {OrderItem[]} items
  * @returns {void}
  */
@@ -317,18 +317,18 @@ function validateItems(items) {
 }
 ```
 
-### 3.3 テストの記述(フェーズ2)
+### 3.3 测试的记述（阶段2）
 
-1. **検証項目を `it.todo` で先に列挙する。** 承認後に断言を埋める。`it.todo('説明')` は本体のない予定テストで、Jest が `todo` として保留表示する(`it` = `test` = 1テストケース)。
-2. **型は再利用される値にのみ付ける。** fixtures / factories / mocks / helpers に JSDoc 型を付け、`it(...)` のコールバック本体には付けない。
-3. **テスト構造は source の鏡写しとする。** 1公開関数 = 1 `describe`、1振る舞い = 1 `it`。カバレッジが契約と 1:1 対応する。
+1. **先用 `it.todo` 列举验证项。** 批准后填入断言。`it.todo('说明')` 是没有本体的预定测试，Jest 将其作为 `todo` 保留显示（`it` = `test` = 1 个测试用例）。
+2. **类型仅给会被复用的值标注。** 给 fixtures / factories / mocks / helpers 标注 JSDoc 类型，不给 `it(...)` 的回调本体标注。
+3. **测试结构为 source 的镜像。** 1 个公开函数 = 1 个 `describe`，1 个行为 = 1 个 `it`。使覆盖与契约 1:1 对应。
 
-用語: **fixture** = 固定サンプルデータ / **factory** = テストデータ生成関数 / **mock** = 依存の代替 / **helper** = 複数テスト共通の関数。
+术语：**fixture** = 固定样本数据 / **factory** = 测试数据生成函数 / **mock** = 依赖的替代 / **helper** = 多个测试共用的函数。
 
 ```js
 describe('buildOrder', () => {
-  it.todo('明細から注文を構築し status は pending');
-  it.todo('items が空なら RangeError を投げる');
+  it.todo('从明细构建订单且 status 为 pending');
+  it.todo('items 为空则抛出 RangeError');
 });
 ```
 
@@ -338,81 +338,81 @@ import { describe, it, expect } from '@jest/globals';
 import { buildOrder } from './order.js';
 
 /**
- * OrderItem を生成する factory(再利用されるので型を付ける)。
+ * 生成 OrderItem 的 factory(因会被复用故标注类型)。
  * @param {Partial<import('./order.js').OrderItem>} [overrides]
  * @returns {import('./order.js').OrderItem}
  */
 const makeItem = (overrides = {}) => ({ sku: 'A1', qty: 1, ...overrides });
 
 describe('buildOrder', () => {
-  it('明細から注文を構築し status は pending', () => {
+  it('从明细构建订单且 status 为 pending', () => {
     const order = buildOrder([makeItem()]);
     expect(order.status).toBe('pending');
   });
-  it('items が空なら RangeError を投げる', () => {
+  it('items 为空则抛出 RangeError', () => {
     expect(() => buildOrder([])).toThrow(RangeError);
   });
 });
 ```
 
-### 3.4 テストの配置
+### 3.4 测试的放置
 
-テストは業務ファイルに記さず、常に別ファイルとする。テスト層は次のとおり:
+测试不记于业务文件，始终为另外的文件。测试层如下：
 
-- **単体(Jest)** — 実装ファイルの隣に `<name>.test.js` を置く(ヘルパー `src/helper/order.js` ↔ `src/helper/order.test.js`、Server Action `src/action/checkout.js` ↔ `src/action/checkout.test.js`。Expo ロジックは jest-expo)。コンポーネント / 画面は単体テストを持たず、振る舞いは end2end で検証する(§3.6)。
-- **endpoint(Playwright)** — 各 next アプリの `src/endpoint/` に置く(定義は §1.3)。
-- **end2end(web=Playwright)** — next アプリは `src/end2end/`、Expo アプリは `src/end2end/web/`(Expo は web/native の2ランナーのため `end2end/` を分割)。定義は §1.3。
-- **end2end(native=Maestro)** — `app/expo-<名>/src/end2end/native/` に Maestro フロー(`*.yaml`)を置く(`.yaml` は tsc/jest 対象外)。`maestro test app/expo-<名>/src/end2end/native` を、`expo prebuild` + `expo run` でシミュレータに導入したアプリに対して実行する(`turbo run test` には含めずフェーズ4で別実行)。Maestro フローは test DSL のため house-rule「YAML を JSON 構文で書く」の対象外(idiomatic Maestro YAML)とする。
+- **单元（Jest）** — 在实现文件旁放 `<name>.test.js`（辅助函数 `src/helper/order.js` ↔ `src/helper/order.test.js`，Server Action `src/action/checkout.js` ↔ `src/action/checkout.test.js`。Expo 逻辑用 jest-expo）。组件 / 画面不持有单元测试，行为以 end2end 验证（§3.6）。
+- **endpoint（Playwright）** — 放于各 next 应用的 `src/endpoint/`（定义见 §1.3）。
+- **end2end（web=Playwright）** — next 应用为 `src/end2end/`，Expo 应用为 `src/end2end/web/`（Expo 因 web/native 两个 runner 而将 `end2end/` 分割）。定义见 §1.3。
+- **end2end（native=Maestro）** — 在 `app/expo-<名>/src/end2end/native/` 放 Maestro 流程（`*.yaml`）（`.yaml` 不在 tsc/jest 对象内）。对以 `expo prebuild` + `expo run` 导入模拟器的应用执行 `maestro test app/expo-<名>/src/end2end/native`（不纳入 `turbo run test`，在阶段4 单独执行）。Maestro 流程因是 test DSL 而不在 house-rule“YAML 以 JSON 语法书写”的对象内（idiomatic Maestro YAML）。
 
 ```
 app/next-shop/src/type/order.js            # 共有型(@typedef)
-app/next-shop/src/helper/order.js          # ヘルパー(純粋関数)
-app/next-shop/src/helper/order.test.js     # Jest 単体 — 隣に置く
-app/next-shop/src/action/checkout.js       # Server Action('use server'。純粋部は helper へ抽出)
-app/next-shop/src/action/checkout.test.js  # Jest(関数・共通・外部サービスの HTTP を MSW で mock)
+app/next-shop/src/helper/order.js          # 辅助函数(纯函数)
+app/next-shop/src/helper/order.test.js     # Jest 单元 — 放在旁边
+app/next-shop/src/action/checkout.js       # Server Action('use server'。纯粹部分提取到 helper)
+app/next-shop/src/action/checkout.test.js  # Jest(函数、公共、外部服务的 HTTP 用 MSW mock)
 app/next-shop/src/app/api/orders/route.js  # API(Route Handler)
-app/next-shop/src/app/checkout/page.jsx    # page / コンポーネント(.jsx)— 単体テストなし(§3.6)
-app/next-shop/src/endpoint/orders.spec.js  # endpoint(Route を request で検証・ブラウザ不要)
-app/next-shop/src/end2end/checkout.spec.js # end2end(web・Playwright)
-app/expo-shop/src/helper/cart.js           # Expo ロジック
-app/expo-shop/src/helper/cart.test.js      # jest-expo 単体
-app/expo-shop/src/end2end/web/home.spec.js # end2end(Expo web・Playwright)
-app/expo-shop/src/end2end/native/home.yaml # end2end(native・Maestro フロー)
-package/order/src/helper/money.js          # 共有ライブラリ(非依存ロジック)
-package/order/src/helper/money.test.js     # Jest 単体
+app/next-shop/src/app/checkout/page.jsx    # page / 组件(.jsx)— 无单元测试(§3.6)
+app/next-shop/src/endpoint/orders.spec.js  # endpoint(用 request 验证 Route、无需浏览器)
+app/next-shop/src/end2end/checkout.spec.js # end2end(web、Playwright)
+app/expo-shop/src/helper/cart.js           # Expo 逻辑
+app/expo-shop/src/helper/cart.test.js      # jest-expo 单元
+app/expo-shop/src/end2end/web/home.spec.js # end2end(Expo web、Playwright)
+app/expo-shop/src/end2end/native/home.yaml # end2end(native、Maestro 流程)
+package/order/src/helper/money.js          # 共享库(无依赖逻辑)
+package/order/src/helper/money.test.js     # Jest 单元
 ```
 
-根拠: 業務ファイルにテストを混在させると本番バンドルへ混入し、`tsc` / レビュー / カバレッジ計測が煩雑になる。別ファイルなら「`tsc` の対象 / Jest の対象 / 本番バンドル」を切り分けられる。
+依据：若在业务文件中混入测试，会混进生产 bundle，使 `tsc` / 评审 / 覆盖率计量变繁琐。另作文件则可切分“`tsc` 的对象 / Jest 的对象 / 生产 bundle”。
 
-注: `.test`(Jest)・`.spec`(Playwright)は各ランナーの既定検出マッチャであり(spec = BDD 由来の「仕様」)、慣習に従う。
+注：`.test`（Jest）、`.spec`（Playwright）是各 runner 的默认检测匹配器（spec = 源自 BDD 的“规约”），遵循惯例。
 
-### 3.5 型チェック
+### 3.5 类型检查
 
-型検査は **ワークスペース毎の `jsconfig.json`** で行う(モノレポのため program はアプリ・ライブラリ単位。`turbo run typecheck` で横断)。各 `.js / .jsx` 先頭に `// @ts-check` を置き、各ワークスペースの `src/` 全体(helper / app / endpoint / end2end / component)を1つの program で検査する。
+类型检查以**每个工作区的 `jsconfig.json`** 进行（因 monorepo，program 为应用、库单位。以 `turbo run typecheck` 横跨）。在各 `.js / .jsx` 开头放 `// @ts-check`，将各工作区的整个 `src/`（helper / app / endpoint / end2end / component）以一个 program 检查。
 
-- `jsconfig.json` に `allowJs` + `checkJs` + `noEmit` + `jsx`(Next.js が設定)+ **`types: ["node"]`** を設定する(Next.js 生成の `jsconfig.json` に `checkJs` / `types` を足す)。検証は `tsc -p jsconfig.json --noEmit`(`tsc` は `jsconfig.json` を自動で読まないため `-p` 必須)。
-- **テスト型は import 由来に統一する** — Jest は `@jest/globals`、Playwright は `@playwright/test` から `test` / `expect` を import する(§3.3)。グローバル `types` に jest と playwright を同居させると両者が `expect` / `test` を拡張して衝突するため、グローバル注入をやめ import 由来の型に揃える。
+- 在 `jsconfig.json` 设置 `allowJs` + `checkJs` + `noEmit` + `jsx`（Next.js 设置）+ **`types: ["node"]`**（向 Next.js 生成的 `jsconfig.json` 加上 `checkJs` / `types`）。验证为 `tsc -p jsconfig.json --noEmit`（`tsc` 不会自动读取 `jsconfig.json`，故 `-p` 必需）。
+- **测试类型统一为 import 来源** — Jest 从 `@jest/globals`、Playwright 从 `@playwright/test` import `test` / `expect`（§3.3）。若在全局 `types` 中同居 jest 与 playwright，二者会扩展 `expect` / `test` 而冲突，故停止全局注入、统一为 import 来源的类型。
 
-型は JSDoc に書くので `.d.ts` は作らない。開発依存は `typescript` / `@types/node` / `@playwright/test` / `msw`(共通・外部サービスの HTTP mock)(JSX 型検査には `@types/react`、Expo は `jest-expo` と Expo / React Native 同梱型)。`@types/jest` は使わない(`@jest/globals` が型を同梱する)。**Maestro は別 CLI**(npm 依存ではなく別途インストール)。
+类型写在 JSDoc 中故不创建 `.d.ts`。开发依赖为 `typescript` / `@types/node` / `@playwright/test` / `msw`（公共服务、外部服务的 HTTP mock）（JSX 类型检查用 `@types/react`，Expo 用 `jest-expo` 与 Expo / React Native 内置类型）。不使用 `@types/jest`（`@jest/globals` 内置类型）。**Maestro 是另外的 CLI**（不是 npm 依赖，需另行安装）。
 
-### 3.6 コード種別ごとのテスト
+### 3.6 按代码种别的测试
 
-契約優先は全コードに適用する。型契約(JSDoc)は `tsc` が全コードで検査する。振る舞いテストは**コード種別**ごとに対応する(役割やデプロイ先には依らない):**ヘルパー・Server Action・Expo ロジック・共有ライブラリは Jest(Expo は jest-expo)、API(Route Handler)は endpoint、UI は end2end**。end2end は **web・Expo web が Playwright、Expo native が Maestro**。**test-first は Jest に限り、endpoint・end2end は実装後の受入テストとする**(§2.1)。**全 next ルート(page/layout)と Expo の全画面を例外なく end2end の対象とする**(各 page に課し、layout は配下ルート経由で検証。UI を持たない API 専用 next アプリは endpoint と Jest のみ)。RTL / jsdom によるコンポーネント単体テストは**使わない**(end2end と重複し、async Server Component の制約も避けられる)。
+契约优先适用于全部代码。类型契约（JSDoc）由 `tsc` 对全部代码检查。行为测试按**代码种别**对应（不依赖角色或部署目标）：**辅助函数、Server Action、Expo 逻辑、共享库用 Jest（Expo 为 jest-expo），API（Route Handler）用 endpoint，UI 用 end2end**。end2end 中 **web、Expo web 为 Playwright，Expo native 为 Maestro**。**test-first 仅限 Jest，endpoint、end2end 作为实现后的验收测试**（§2.1）。**全部 next 路由（page/layout）与 Expo 的全部画面无例外地作为 end2end 的对象**（施加于各 page，layout 经由其下路由验证。不持有 UI 的 API 专用 next 应用仅 endpoint 与 Jest）。**不使用** RTL / jsdom 的组件单元测试（与 end2end 重复，也可回避 async Server Component 的约束）。
 
-| コード種別 | 型契約 | 振る舞いテスト |
+| 代码种别 | 类型契约 | 行为测试 |
 |---|---|---|
-| ヘルパー(純粋関数。`src/helper/`) | JSDoc(`@param` / `@returns` / `@typedef`)→ `tsc` | **Jest 単体**(戻り値・例外を assert) |
-| Server Action(`src/action/`・使う場合) | JSDoc → `tsc` | **Jest 単体**(関数として直接 import・共通・外部サービスの HTTP を MSW で mock)。純粋部は `src/helper/` ヘルパーへ抽出 |
-| Route Handler(API。`src/app/api/`) | JSDoc → `tsc` | **endpoint**(Playwright `request`・共通・外部サービスを env で stub した dev サーバ・ブラウザ無し) |
-| React コンポーネント / page / layout(next UI) | props を JSDoc で型付け → `tsc` | **end2end**(Playwright・ブラウザ) |
-| Expo ロジック(helper・hooks。`app/expo-*/src/`) | JSDoc → `tsc` | **Jest 単体(jest-expo)** |
-| Expo UI — web(SPA / SSG) | props を JSDoc で型付け → `tsc` | **end2end(Playwright)**(`expo export -p web` / dev サーバに対して) |
-| Expo UI — native(画面・コンポーネント) | props を JSDoc で型付け → `tsc` | **end2end(Maestro)**(ローカルビルド / シミュレータに対して) |
-| 共有ライブラリ(`package/*`・非依存ロジック) | JSDoc → `tsc` | **Jest 単体** |
+| 辅助函数（纯函数。`src/helper/`） | JSDoc（`@param` / `@returns` / `@typedef`）→ `tsc` | **Jest 单元**（assert 返回值、异常） |
+| Server Action（`src/action/`、使用时） | JSDoc → `tsc` | **Jest 单元**（作为函数直接 import，公共服务、外部服务的 HTTP 用 MSW mock）。纯粹部分提取到 `src/helper/` 辅助函数 |
+| Route Handler（API。`src/app/api/`） | JSDoc → `tsc` | **endpoint**（Playwright `request`，公共服务、外部服务用 env stub 的 dev 服务器，无浏览器） |
+| React 组件 / page / layout（next UI） | 以 JSDoc 为 props 标注类型 → `tsc` | **end2end**（Playwright、浏览器） |
+| Expo 逻辑（helper、hooks。`app/expo-*/src/`） | JSDoc → `tsc` | **Jest 单元（jest-expo）** |
+| Expo UI — web（SPA / SSG） | 以 JSDoc 为 props 标注类型 → `tsc` | **end2end（Playwright）**（针对 `expo export -p web` / dev 服务器） |
+| Expo UI — native（画面、组件） | 以 JSDoc 为 props 标注类型 → `tsc` | **end2end（Maestro）**（针对本地构建 / 模拟器） |
+| 共享库（`package/*`、无依赖逻辑） | JSDoc → `tsc` | **Jest 单元** |
 
-- Route Handler・Server Action・コンポーネント・画面は薄く保ち、決定的な判断・計算(framework API〔`cookies()`・`revalidatePath()` 等〕や I/O を含まない処理)は `src/helper/`(共有なら `package/*`)のヘルパーへ抽出して Jest 単体で固める。Route Handler は共通・外部サービスを呼ぶ薄い BFF 境界とし、UI 層はコンポジションと表示に限る。
-- endpoint は dev サーバに対して実行するため in-process mock は使えない。**env 変数で共通・外部サービスの base URL をローカル stub サーバへ向け**、Playwright の `webServer` で dev サーバごと起動して Route Handler の入出力・経路を検証する(Server Action〔Jest〕は MSW で HTTP を mock。別手段)。
-- コンポーネント・Expo 画面のスタブも props を JSDoc で型付けし、本体は `throw` とする。Expo の振る舞いは framework 非依存ロジックを `src/helper`(共有なら `package/*`)へ出して jest-expo で固め、native 画面は Maestro(ローカルビルド / シミュレータ)、web は Playwright(`expo export -p web` または dev サーバ)で end2end する。なお `src/endpoint/`・`src/action/` は将来 SSR(`web.output:'server'`)採用時に Next と同じ規約(endpoint / Jest)で使う予約枠で、現状スコープでは空でよい。
+- Route Handler、Server Action、组件、画面保持轻薄，将确定性的判断、计算（不含 framework API〔`cookies()`、`revalidatePath()` 等〕或 I/O 的处理）提取到 `src/helper/`（若共享则 `package/*`）的辅助函数并用 Jest 单元固化。Route Handler 设为调用公共服务、外部服务的轻薄 BFF 边界，UI 层仅限组合与显示。
+- endpoint 针对 dev 服务器执行故不能用 in-process mock。**用 env 变量将公共服务、外部服务的 base URL 指向本地 stub 服务器**，以 Playwright 的 `webServer` 连同 dev 服务器一起启动来验证 Route Handler 的输入输出、路径（Server Action〔Jest〕用 MSW mock HTTP。另一手段）。
+- 组件、Expo 画面的桩也以 JSDoc 为 props 标注类型，本体为 `throw`。Expo 的行为是将 framework 无关逻辑放到 `src/helper`（若共享则 `package/*`）并用 jest-expo 固化，native 画面用 Maestro（本地构建 / 模拟器），web 用 Playwright（`expo export -p web` 或 dev 服务器）做 end2end。另外 `src/endpoint/`、`src/action/` 是将来采用 SSR（`web.output:'server'`）时以与 Next 相同规约（endpoint / Jest）使用的预留位，现状范围内为空即可。
 
 ```jsx
 // @ts-check
@@ -424,16 +424,16 @@ export function OrderCard({ order, onCancel }) {
 }
 ```
 
-- UI 用の追加テスト依存は不要とする。型のため `@types/react` と `jsconfig.json` の `jsx`(Next.js が設定)を要する。
+- UI 用的追加测试依赖不需要。为类型需要 `@types/react` 与 `jsconfig.json` 的 `jsx`（Next.js 设置）。
 
-Server Action(使う場合)は `src/action/checkout.js` のように薄い関数として書き、純粋部はヘルパーへ出す。**UI から呼ばれる手段**である:例えば checkout ページの `<form action={checkout}>` が `checkout()` を呼ぶ。フォーム(UI)が無ければ呼び出し元が無いので、Server Action は UI を持つ next アプリにのみ存在する(画面を持たない API 専用アプリは `/api/...` の Route Handler で公開する)。共通サービスは `fetch` で直接呼び、テスト(`src/action/checkout.test.js`)は end2end ではなく**関数として Jest** で行い、共通サービスへの HTTP を **MSW** で mock する。
+Server Action（使用时）像 `src/action/checkout.js` 那样写成轻薄函数，纯粹部分放到辅助函数。它是**被 UI 调用的手段**：例如 checkout 页面的 `<form action={checkout}>` 调用 `checkout()`。若没有表单（UI）则没有调用方，故 Server Action 仅存在于持有 UI 的 next 应用中（不持有画面的 API 专用应用以 `/api/...` 的 Route Handler 公开）。公共服务用 `fetch` 直接调用，测试（`src/action/checkout.test.js`）不做 end2end 而**作为函数用 Jest** 进行，将到公共服务的 HTTP 用 **MSW** mock。
 
 ```js
 // @ts-check
 'use server';
 
 /**
- * 確定した注文を共通サービスへ送る。
+ * 将已确定的订单发送至公共服务。
  * @param {import('@/type/order').OrderItem[]} items
  * @returns {Promise<{ id: string }>}
  */
@@ -456,38 +456,38 @@ beforeAll(() => server.listen());
 afterAll(() => server.close());
 
 describe('checkout', () => {
-  it('注文を共通サービスへ送り id を返す', async () => {
+  it('将订单发送至公共服务并返回 id', async () => {
     expect((await checkout([{ sku: 'A1', qty: 1 }])).id).toBe('o1');
   });
 });
 ```
 
-### 3.7 ツール設定(モノレポ実装の前提)
+### 3.7 工具配置（monorepo 实现的前提）
 
-実装時に要する、検証済みの最小設定:
+实现时所需的、经过验证的最小配置：
 
-- **turbo.json** — タスク `typecheck` / `test` / `lint` / `build` / `dev` を定義。`typecheck` は各 workspace の `tsc -p jsconfig.json --noEmit`、`test` は各 workspace の `jest`。`dependsOn` / `outputs` でキャッシュ。回帰確認は `turbo run typecheck test`(Stop フックが実行。§6)。
-- **Next.js の workspace 取り込み** — `next.config` に `transpilePackages: ['<package/* の name>']` を置く(未トランスパイルの共有ライブラリを import するため必須)。
-- **Jest × ESM** — `"type":"module"` のため `NODE_OPTIONS=--experimental-vm-modules` で実行する。next / `package/*` は素の Jest、Expo は `jest-expo` preset。
-- **Expo × ESM** — `"type":"module"` 統一に伴い Metro / Babel 設定は `metro.config.cjs` / `babel.config.cjs`(CommonJS)とする(`.js` だと ESM 扱いで壊れるため)。
-- **共有ライブラリの依存宣言** — 各アプリは `package/*` を `"<name>": "*"` で `dependencies` に宣言する(npm workspaces が解決)。ライブラリ名は scope 付き(例 `@app/order`)。
-- **Expo 型検査** — `@types/react` と Expo / React Native 同梱型で JSX を `tsc` 検査する(§3.5)。
+- **turbo.json** — 定义任务 `typecheck` / `test` / `lint` / `build` / `dev`。`typecheck` 为各 workspace 的 `tsc -p jsconfig.json --noEmit`，`test` 为各 workspace 的 `jest`。以 `dependsOn` / `outputs` 缓存。回归确认为 `turbo run typecheck test`（Stop 钩子执行。§6）。
+- **Next.js 的 workspace 取入** — 在 `next.config` 放 `transpilePackages: ['<package/* 的 name>']`（为 import 未转译的共享库所必需）。
+- **Jest × ESM** — 因 `"type":"module"`，以 `NODE_OPTIONS=--experimental-vm-modules` 执行。next / `package/*` 用原生 Jest，Expo 用 `jest-expo` preset。
+- **Expo × ESM** — 随 `"type":"module"` 统一，Metro / Babel 配置设为 `metro.config.cjs` / `babel.config.cjs`（CommonJS）（若为 `.js` 则被当作 ESM 而损坏）。
+- **共享库的依赖声明** — 各应用在 `dependencies` 中以 `"<name>": "*"` 声明 `package/*`（由 npm workspaces 解析）。库名带 scope（例 `@app/order`）。
+- **Expo 类型检查** — 以 `@types/react` 与 Expo / React Native 内置类型对 JSX 做 `tsc` 检查（§3.5）。
 
 ---
 
-## 4. Superpowers との関係
+## 4. 与 Superpowers 的关系
 
-supadevops は Superpowers を置き換えず補強する。汎用プロセスの各フェーズに、JS+JSDoc 固有の規律(JSDoc 契約・`tsc`/`jest` 検証・並列実装)を注入する。
+supadevops 不替换 Superpowers 而增强它。向通用流程的各阶段注入 JS+JSDoc 固有的纪律（JSDoc 契约、`tsc`/`jest` 验证、并行实现）。
 
 ```mermaid
 flowchart TB
-    subgraph SP["Superpowers(土台=汎用プロセス)"]
+    subgraph SP["Superpowers(基础=通用流程)"]
       direction LR
       B["brainstorming"] --> PL["plan"] --> IMP["implementation(TDD)"] --> CR["code review"]
     end
-    subgraph SUPA["supadevops(JS+JSDoc 固有の規律を注入して補強)"]
+    subgraph SUPA["supadevops(注入 JS+JSDoc 固有的纪律以增强)"]
       direction LR
-      J0["要件明確化"] --> J1["Plan(契約)<br/>.js/.jsx に JSDoc+スタブ"] --> J23["Test(red)→Implement<br/>+Workflow並列(任意)"] --> J5["Finish<br/>supa-review(任意)"]
+      J0["需求明确化"] --> J1["Plan(契约)<br/>在 .js/.jsx 写 JSDoc+桩"] --> J23["Test(red)→Implement<br/>+Workflow并行(可选)"] --> J5["Finish<br/>supa-review(可选)"]
     end
     B -.->|注入| J0
     PL -.->|注入| J1
@@ -498,28 +498,28 @@ flowchart TB
     style SUPA fill:#1f6feb14,stroke:#58a6ff,stroke-width:1px;
 ```
 
-| Superpowers のフェーズ | 方針 |
+| Superpowers 的阶段 | 方针 |
 |---|---|
-| brainstorming | Superpowers を直接使う |
-| plan | 補強。Plan で実 `.js / .jsx` に JSDoc 契約を直接書く |
-| subagent-driven implementation | フェーズ1–3 に規律を注入(§4.1) |
-| code review | Superpowers を直接使う。JS+JSDoc 特化が要れば `supa-reviewer` で補強 |
+| brainstorming | 直接使用 Superpowers |
+| plan | 增强。在 Plan 中向真实 `.js / .jsx` 直接写 JSDoc 契约 |
+| subagent-driven implementation | 向阶段1–3 注入纪律（§4.1） |
+| code review | 直接使用 Superpowers。若需要 JS+JSDoc 特化则以 `supa-reviewer` 增强 |
 
-契約スタブはインターフェースであり実装本体ではない(本体は `throw` のみ)。単体テストは実装より前に書くため(endpoint・end2end は実装後の受入テスト。§2.1)、Superpowers の「テスト先行」原則と両立する。
+契约桩是接口而非实现本体（本体仅 `throw`）。单元测试因先于实现编写（endpoint、end2end 为实现后的验收测试。§2.1），与 Superpowers 的“测试先行”原则兼容。
 
-### 4.1 規律は常時併用・実装の駆動役のみ択一
+### 4.1 纪律常时并用、仅实现的驱动角色二选一
 
 ```mermaid
 flowchart TB
-    subgraph L1["規律の層 — 常に併用(衝突しない)"]
-      A["supa: JSDoc契約優先<br/>契約→テスト→実装・tsc/jest"]
+    subgraph L1["纪律的层 — 始终并用(不冲突)"]
+      A["supa: JSDoc契约优先<br/>契约→测试→实现、tsc/jest"]
       B2["Superpowers: TDD"]
       A -.->|併用| B2
     end
-    subgraph L2["オーケストレーションの層 — ここだけ択一"]
+    subgraph L2["编排的层 — 仅此处二选一"]
       C["① 会話内 subagent-driven(既定)"]
-      D2["② supadevops Workflow 並列(任意)"]
-      C -.->|どちらか一方| D2
+      D2["② supadevops Workflow 并行(可选)"]
+      C -.->|二选一| D2
     end
     L1 --> L2
 
@@ -527,110 +527,110 @@ flowchart TB
     style L2 fill:#a371f714,stroke:#a371f7,stroke-width:1px;
 ```
 
-- 規律(JSDoc 契約優先 + Superpowers TDD)は常に併用する。supa の核心「コード前に JSDoc 契約を確定」はどの実装方法でも適用する。
-- 択一なのは実装の駆動役だけとする:① 会話内 subagent-driven(既定)、② supadevops Workflow 並列(§5、任意)。
-- 同じモジュール群に対し ① と ② を同時に走らせてはならない。
+- 纪律（JSDoc 契约优先 + Superpowers TDD）始终并用。supa 的核心“代码前确定 JSDoc 契约”在任何实现方法下都适用。
+- 二选一的只有实现的驱动角色：① 会话内 subagent-driven（默认）、② supadevops Workflow 并行（§5，可选）。
+- 不得对同一组模块同时跑 ① 与 ②。
 
 ---
 
-# 第 II 部 — プラグイン実装
+# 第 II 部 — 插件实现
 
-## 5. Workflow 統合(実装フェーズの並列加速)
+## 5. Workflow 集成（实现阶段的并行加速）
 
-supadevops は、人間ゲートを挟まない実行フェーズ(3 実装 / 4 受入 / 5 レビュー)を並列化する Workflow を3つ定義する。Workflow は Claude Code 本体機能で走行中は人間入力を受け付けないため、1 Workflow = 1フェーズとし、ヒューマンゲートは会話側(skill)が維持する。モノレポでは並列単位をワークスペース内のモジュール / ルート / 画面とし、検証は `turbo` のタスクで行う。
+supadevops 定义 3 个 Workflow，用于并行化不夹入人工门控的执行阶段（3 实现 / 4 验收 / 5 评审）。Workflow 是 Claude Code 本体功能，运行中不接受人工输入，故设为 1 Workflow = 1 阶段，人工门控由会话侧（skill）维持。在 monorepo 中将并行单位设为工作区内的模块 / 路由 / 画面，验证用 `turbo` 的任务进行。
 
-| Workflow ファイル | フェーズ | 並列単位 |
+| Workflow 文件 | 阶段 | 并行单位 |
 |---|---|---|
-| `supa-implement-workflow.js` | 3 実装 | red 済み独立モジュールごとに実装 → jest+tsc |
-| `supa-acceptance-workflow.js` | 4 受入 | Route Handler ごとに endpoint、next ルート / Expo web に Playwright end2end、Expo 画面に Maestro |
-| `supa-review-workflow.js` | 5 レビュー | ファイル / 観点ごとにレビュー |
+| `supa-implement-workflow.js` | 3 实现 | 对 red 完成的独立模块逐一实现 → jest+tsc |
+| `supa-acceptance-workflow.js` | 4 验收 | 对每个 Route Handler 做 endpoint，对 next 路由 / Expo web 做 Playwright end2end，对 Expo 画面做 Maestro |
+| `supa-review-workflow.js` | 5 评审 | 按文件 / 维度评审 |
 
 ```mermaid
 sequenceDiagram
-    participant U as ユーザー
-    participant S as supa-tdd skill(会話)
+    participant U as 用户
+    participant S as supa-tdd skill(会话)
     participant K as supa-implement skill
-    participant W as Workflow ツール
+    participant W as Workflow 工具
     participant A as supa-implementer ×N
-    U->>S: /supa(フェーズ1〜2 を承認しながら)
-    S->>U: 実装フェーズ。並列化する?
-    U->>S: はい(オプトイン)
-    S->>K: authoring プロンプト適用
-    K->>W: supa-implement-workflow.js を生成し Workflow({name}) 起動
-    W->>A: 各モジュール: 実装→jest+tsc
-    A-->>W: green / 失敗
-    W-->>S: 集約結果 → フェーズ4(ゲート)
+    U->>S: /supa(一边批准阶段1～2)
+    S->>U: 实现阶段。要并行化吗?
+    U->>S: 是(选择启用)
+    S->>K: 应用 authoring 提示
+    K->>W: 生成 supa-implement-workflow.js 并启动 Workflow({name})
+    W->>A: 各模块: 实现→jest+tsc
+    A-->>W: green / 失败
+    W-->>S: 汇总结果 → 阶段4(门控)
 ```
 
-- **雛形は同梱しない。** 各 Workflow は専用スキル(`supa-implement` / `supa-acceptance` / `supa-review`)が持つ authoring プロンプトに従い、オプトイン時に `.claude/workflows/supa-<機能>-workflow.js` を生成して `Workflow({ name })` で起動する(`workflow` はプラグイン部品でないため、部品である skill が生成を担う。配置スコープは §7)。
-- **対象** — 独立モジュール(互いに import 依存が無く並列実装で衝突しないもの)が3つ以上、かつユーザー同意時。`args` は未実装スタブを含む `.js / .jsx`(`{ file, testFile }` の配列)から導く。
-- **subagent** — `agentType: 'supa-implementer'`(実装・受入テスト生成)、`supa-reviewer`(レビュー)を使い、内部でも JSDoc / `tsc` / `jest` の規律を適用する。
+- **不内置模板。** 各 Workflow 遵循专用 skill（`supa-implement` / `supa-acceptance` / `supa-review`）所持的 authoring 提示，在选择启用（opt-in）时生成 `.claude/workflows/supa-<功能>-workflow.js` 并以 `Workflow({ name })` 启动（`workflow` 不是插件部件，故由作为部件的 skill 负责生成。放置范围见 §7）。
+- **对象** — 独立模块（彼此无 import 依赖、并行实现不冲突者）3 个以上，且用户同意时。`args` 从含未实现桩的 `.js / .jsx`（`{ file, testFile }` 的数组）导出。
+- **subagent** — 使用 `agentType: 'supa-implementer'`（实现、验收测试生成）、`supa-reviewer`（评审），内部也适用 JSDoc / `tsc` / `jest` 的纪律。
 
 ```js
 export const meta = {
   name: 'supa-implement-workflow',
-  description: 'red 済みモジュールを並列実装し jest+tsc が緑になるまで検証',
+  description: '并行实现已完成 red 的模块并验证至 jest+tsc 转绿',
   phases: [{ title: 'Implement' }, { title: 'Verify' }],
 }
 const out = await pipeline(args,
-  m => agent(`${m.file} のスタブ本体を実装し ${m.testFile} を green に。ESM・throw を残さない。`,
+  m => agent(`实现 ${m.file} 的桩本体并使 ${m.testFile} 转 green。ESM、不残留 throw。`,
              { agentType: 'supa-implementer', label: `impl:${m.file}`, phase: 'Implement' }),
-  (_, m) => agent(`${m.file} を検証: 当該 workspace で turbo run typecheck test(jest + tsc)。失敗なら原因を返す。`,
+  (_, m) => agent(`验证 ${m.file}: 在该 workspace 执行 turbo run typecheck test(jest + tsc)。失败则返回原因。`,
              { label: `verify:${m.file}`, phase: 'Verify', schema: VERDICT }))
 return { results: out.filter(Boolean) }
 ```
 
 ---
 
-## 6. プラグイン構成
+## 6. 插件结构
 
 ```
-supadevops/                               # GitHub: magcen-zone/supadevops で配布
+supadevops/                               # GitHub: magcen-zone/supadevops 分发
 ├── .claude-plugin/
 │   ├── plugin.json                    # name: supadevops / 依存: superpowers
 │   └── marketplace.json               # name: magcen-zone / source "./"
 ├── skills/
-│   ├── supa-tdd/                       # 中核(5フェーズ・ゲート・規約・記入例)
-│   ├── supa-implement/                 # F3 並列実装 Workflow の authoring プロンプト
-│   ├── supa-acceptance/                # F4 並列受入 Workflow の authoring プロンプト
-│   └── supa-review/                    # F5 並列レビュー Workflow の authoring プロンプト
+│   ├── supa-tdd/                       # 核心(5阶段、门控、规约、填写示例)
+│   ├── supa-implement/                 # F3 并行实现 Workflow 的 authoring 提示
+│   ├── supa-acceptance/                # F4 并行验收 Workflow 的 authoring 提示
+│   └── supa-review/                    # F5 并行评审 Workflow 的 authoring 提示
 ├── agents/
-│   ├── supa-implementer.md             # 実装・受入テスト生成担当
-│   └── supa-reviewer.md                # レビュー担当
+│   ├── supa-implementer.md             # 负责实现、验收测试生成
+│   └── supa-reviewer.md                # 负责评审
 ├── hooks/
-│   ├── hooks.json                     # Stop(検証)
+│   ├── hooks.json                     # Stop(验证)
 │   └── validate.sh                    # turbo run typecheck test（tsc + jest）
 ├── commands/
-│   ├── supa.md                         # /supa(開発フロー起動)
-│   └── supa-init.md                    # /supa-init(モノレポ初期化)
+│   ├── supa.md                         # /supa(启动开发流程)
+│   └── supa-init.md                    # /supa-init(monorepo 初始化)
 └── README.md
 ```
 
-skill を中核とし、subagent / hook / command を同梱する。`workflow` はプラグインのコンポーネント定義に存在しないため雛形は同梱せず、各 `supa-<機能>` skill が必要時に `.claude/workflows/supa-<機能>-workflow.js` を生成して実体化する(§5)。`/supa-init` はコマンドで、雛形を同梱せず公式 CLI(`create-next-app --js`、`create-expo-app`〔既定 TS→JS+JSDoc 化〕)と npm 命令に委譲して中立なモノレポ(`app/*` + `package/*` + `turbo.json`)を生成する。
+以 skill 为核心，内置 subagent / hook / command。`workflow` 不存在于插件的组件定义中，故不内置模板，由各 `supa-<功能>` skill 在需要时生成 `.claude/workflows/supa-<功能>-workflow.js` 以实体化（§5）。`/supa-init` 是命令，不内置模板，委托给官方 CLI（`create-next-app --js`、`create-expo-app`〔默认 TS→JS+JSDoc 化〕）与 npm 命令以生成对部署保持中立的 monorepo（`app/*` + `package/*` + `turbo.json`）。
 
 ---
 
-## 7. 命名・配置・配布
+## 7. 命名、放置、分发
 
-| 対象 | 名前 |
+| 对象 | 名字 |
 |---|---|
-| プラグイン / 中核 skill / マーケットプレイス | `supadevops` / `supa-tdd` / `magcen-zone` |
-| Workflow skill(authoring) | `supa-implement` / `supa-acceptance` / `supa-review` |
-| 生成される Workflow | `supa-implement-workflow.js` / `supa-acceptance-workflow.js` / `supa-review-workflow.js`(`.claude/workflows/`) |
+| 插件 / 核心 skill / 市场 | `supadevops` / `supa-tdd` / `magcen-zone` |
+| Workflow skill（authoring） | `supa-implement` / `supa-acceptance` / `supa-review` |
+| 生成的 Workflow | `supa-implement-workflow.js` / `supa-acceptance-workflow.js` / `supa-review-workflow.js`（`.claude/workflows/`） |
 | subagent | `supa-implementer` / `supa-reviewer` |
-| コマンド | `/supa`(開発フロー起動)・`/supa-init`(モノレポ初期化) |
+| 命令 | `/supa`（启动开发流程）、`/supa-init`（monorepo 初始化） |
 
-配置は install の `--scope` で決まる。プラグイン本体は常に `~/.claude/plugins/cache/...`(HOME)に置かれ、生成される Workflow と宣言の置き場所のみスコープで変わる。
+放置由 install 的 `--scope` 决定。插件本体始终放于 `~/.claude/plugins/cache/...`（HOME），仅生成的 Workflow 与声明的放置位置随 scope 变化。
 
 ```mermaid
 flowchart TD
     I{"install --scope ?"}
-    I -->|--scope project| PROJ["skill が repo/.claude/workflows/supa-*-workflow.js を生成<br/>+ repo/.claude/settings.json<br/>(チーム共有)"]
-    I -->|既定 user| HOME["skill が ~/.claude/workflows/supa-*-workflow.js を生成<br/>+ ~/.claude/settings.json<br/>(個人・全プロジェクト)"]
-    BODY["プラグイン本体は常に<br/>~/.claude/plugins/cache/...(HOME)"]
+    I -->|--scope project| PROJ["skill 生成 repo/.claude/workflows/supa-*-workflow.js<br/>+ repo/.claude/settings.json<br/>(团队共享)"]
+    I -->|既定 user| HOME["skill 生成 ~/.claude/workflows/supa-*-workflow.js<br/>+ ~/.claude/settings.json<br/>(个人、全部项目)"]
+    BODY["插件本体始终在<br/>~/.claude/plugins/cache/...(HOME)"]
 ```
 
-宣言は `settings.json` に2キーを置く。チーム配布では `extraKnownMarketplaces` を併記し、clone + トラストで手動 add を不要にする。本社マーケットプレイスは **github.com/magcen-zone**。
+声明在 `settings.json` 放 2 个 key。团队分发时并记 `extraKnownMarketplaces`，以 clone + 信任使手动 add 变得不必要。本社市场为 **github.com/magcen-zone**。
 
 ```json
 {
@@ -643,13 +643,13 @@ flowchart TD
 
 ---
 
-## 8. 実装リファレンス(確認済み)
+## 8. 实现参考（已确认）
 
-- **plugin.json** — `name` 必須。依存は `dependencies: [{ "name": "superpowers" }]`(文字列 `"superpowers"` も可)。
-- **marketplace.json** — `name / owner / plugins[]`。`source` は `./` で始まる相対パス必須(ルート同居は `"./"`)。`metadata.description` 推奨。
-- **コンポーネント** — `skills / agents / hooks / commands / .mcp.json / .lsp.json / monitors / output-styles`(`workflows` は含まれない)。
-- **hooks** — `hooks/hooks.json`。supadevops は `Stop`(検証)を使用し、`turbo run typecheck test`(tsc + jest)のみを実行する(高速。endpoint/end2end はフェーズ4)。コマンドで `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PROJECT_DIR}` を使用可。
-- **配布スコープ** — `claude plugin install <p>@<mp> --scope user|project`(配置先・宣言は §7 が正本)。`extraKnownMarketplaces` 併記でチーム自動解決。
-- **Workflow** — `Workflow({ name })` は `.claude/workflows/` を解決、`Workflow({ scriptPath })` は任意の `.js` を実行する。`args` は実 JSON で渡る。
-- **init** — `/supa-init` は雛形を同梱せず公式 CLI と npm 命令に委譲する:root は `npm`(`"workspaces": ["app/*","package/*"]` + `package-lock.json` + `node_modules`)、next は `create-next-app --js --app --src-dir --no-eslint --no-tailwind --no-import-alias --use-npm`(`--yes` は既定 TS のため使わない)。Expo は `create-expo-app`(既定 TS+Expo Router)を生成後 **JS+JSDoc へ変換**する:`.ts/.tsx`→`.js/.jsx`・型注釈除去(JSDoc 化)・`tsconfig.json`→`jsconfig.json`・`metro.config`/`babel.config`→`.cjs`・typed routes 無効化(**最もリスクが高い工程**)。`turbo.json` / `next.config`(`transpilePackages`)等の固有設定のみ plugin が用意する。Expo web は `app.json` の `web.output`(`single` / `static`)で SPA / SSG を選ぶ。
-- **中立性** — supadevops はデプロイ・ホスティングに中立で、特定サービス(EAS / Vercel / App Hosting / Cloud Run / Firebase Hosting 等)を前提にしない。デプロイ先・ネットワーク・IAM・アプリの役割区分は開発者裁量(§1.4 末尾は本社の参考例)。
+- **plugin.json** — `name` 必需。依赖为 `dependencies: [{ "name": "superpowers" }]`（字符串 `"superpowers"` 亦可）。
+- **marketplace.json** — `name / owner / plugins[]`。`source` 必须以 `./` 开头的相对路径（与根同居为 `"./"`）。推荐 `metadata.description`。
+- **组件** — `skills / agents / hooks / commands / .mcp.json / .lsp.json / monitors / output-styles`（不含 `workflows`）。
+- **hooks** — `hooks/hooks.json`。supadevops 使用 `Stop`（验证），仅执行 `turbo run typecheck test`（tsc + jest）（快速。endpoint/end2end 在阶段4）。命令中可用 `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PROJECT_DIR}`。
+- **分发范围** — `claude plugin install <p>@<mp> --scope user|project`（放置目标、声明以 §7 为正本）。并记 `extraKnownMarketplaces` 即可团队自动解析。
+- **Workflow** — `Workflow({ name })` 解析 `.claude/workflows/`，`Workflow({ scriptPath })` 执行任意 `.js`。`args` 以真实 JSON 传入。
+- **init** — `/supa-init` 不内置模板，委托给官方 CLI 与 npm 命令：root 用 `npm`（`"workspaces": ["app/*","package/*"]` + `package-lock.json` + `node_modules`），next 用 `create-next-app --js --app --src-dir --no-eslint --no-tailwind --no-import-alias --use-npm`（`--yes` 因默认 TS 而不使用）。Expo 在生成 `create-expo-app`（默认 TS+Expo Router）后**转换为 JS+JSDoc**：`.ts/.tsx`→`.js/.jsx`、移除类型注解（JSDoc 化）、`tsconfig.json`→`jsconfig.json`、`metro.config`/`babel.config`→`.cjs`、禁用 typed routes（**风险最高的工序**）。`turbo.json` / `next.config`（`transpilePackages`）等固有配置仅由 plugin 准备。Expo web 以 `app.json` 的 `web.output`（`single` / `static`）选择 SPA / SSG。
+- **中立性** — supadevops 对部署、托管保持中立，不以特定服务（EAS / Vercel / App Hosting / Cloud Run / Firebase Hosting 等）为前提。部署目标、网络、IAM、应用的角色划分由开发者裁量（§1.4 末尾为本社的参考例）。

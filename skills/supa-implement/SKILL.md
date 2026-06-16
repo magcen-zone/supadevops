@@ -1,41 +1,41 @@
 ---
 name: supa-implement
-description: supadevops フェーズ3(実装)の並列加速 authoring スキル。red 済みで互いに独立したモジュールが3つ以上あり、ユーザーが並列化にオプトインしたとき、.claude/workflows/supa-implement-workflow.js を生成し Workflow で各モジュールを並列実装→turbo typecheck test する。supa-tdd の実装フェーズで「並列化する?」に同意が得られた場面で使う。モジュールが2つ以下・相互依存・オプトイン無しのときは使わず、会話内で逐次実装する。
+description: supadevops 阶段3（实现）的并行加速 authoring 技能。当已完成 red 且互相独立的模块有3个以上、且用户选择启用（opt-in）并行化时，生成 .claude/workflows/supa-implement-workflow.js 并以 Workflow 并行实现各模块→turbo typecheck test。用于在 supa-tdd 的实现阶段对"是否并行化？"取得同意的场景。当模块在2个以下、互相依赖、或无选择启用时不使用，而在会话内串行实现。
 ---
 
-# supa-implement — 実装フェーズの並列 Workflow(authoring)
+# supa-implement — 实现阶段的并行 Workflow（authoring）
 
-`supa-tdd` のフェーズ3を **Workflow で並列化**する。**雛形は同梱しない**。本スキルの指示で `.claude/workflows/supa-implement-workflow.js` を生成し `Workflow({ name: 'supa-implement-workflow' })` で起動する。
+将 `supa-tdd` 的阶段3 **以 Workflow 并行化**。**不内置模板**。依据本技能的指示生成 `.claude/workflows/supa-implement-workflow.js` 并以 `Workflow({ name: 'supa-implement-workflow' })` 启动。
 
-## オーケストレーション
+## 编排
 
 ```mermaid
 sequenceDiagram
-    participant U as ユーザー
-    participant S as supa-tdd(会話)
-    participant K as supa-implement(本スキル)
-    participant W as Workflow ツール
+    participant U as 用户
+    participant S as supa-tdd（会话）
+    participant K as supa-implement（本技能）
+    participant W as Workflow 工具
     participant A as supa-implementer ×N
-    U->>S: /supa(フェーズ1〜2 を承認)
-    S->>U: 実装フェーズ。並列化する?
-    U->>S: はい(オプトイン)
-    S->>K: authoring 適用
-    K->>W: supa-implement-workflow.js を生成し起動
-    W->>A: 各モジュール: 実装 → turbo typecheck test
-    A-->>W: green / 失敗
-    W-->>S: 集約 → フェーズ4(ゲート)
+    U->>S: /supa（批准阶段1～2）
+    S->>U: 实现阶段。是否并行化？
+    U->>S: 是（选择启用）
+    S->>K: 应用 authoring
+    K->>W: 生成并启动 supa-implement-workflow.js
+    W->>A: 各模块：实现 → turbo typecheck test
+    A-->>W: green / 失败
+    W-->>S: 汇总 → 阶段4（门控）
 ```
 
-## 使う条件(すべて満たすとき)
-- フェーズ2まで完了(契約 + red テストが揃っている)。
-- **互いに import 依存が無く並列実装で衝突しない独立モジュールが3つ以上**。
-- **ユーザーがオプトイン**(会話側がヒューマンゲートを維持。Workflow 走行中は人間入力不可)。
-- 会話内 subagent-driven と **同時併用しない**(駆動役は択一)。
+## 使用条件（全部满足时）
+- 阶段2为止已完成（契约 + red 测试齐备）。
+- **互相无 import 依赖、并行实现不会冲突的独立模块有3个以上**。
+- **用户选择启用**（会话侧维持人工门控。Workflow 运行中无法人工输入）。
+- 与会话内 subagent-driven **不同时并用**（驱动角色二选一）。
 
-満たさなければ Workflow 化せず、会話内で逐次実装する。
+不满足则不做 Workflow 化，而在会话内串行实现。
 
-## 生成手順
-1. 未実装スタブを含む `.js/.jsx` から `args` を導く(独立モジュールのみ)。例:
+## 生成步骤
+1. 从含未实现桩的 `.js/.jsx` 导出 `args`（仅独立模块）。例：
 ```js
 const args = [
   { file: 'app/next-shop/src/helper/order.js',   testFile: 'app/next-shop/src/helper/order.test.js' },
@@ -43,24 +43,24 @@ const args = [
   { file: 'package/order/src/helper/money.js',    testFile: 'package/order/src/helper/money.test.js' },
 ];
 ```
-2. 配置スコープ:install が `--scope project` なら `repo/.claude/workflows/`、既定 user なら `~/.claude/workflows/`。
-3. 下記スクリプトを `supa-implement-workflow.js` として書き、`Workflow({ name: 'supa-implement-workflow' })` で起動。`args` は実 JSON で渡る。
-4. 集約結果を会話へ返し、**フェーズ4(ゲート)** へ。
+2. 放置范围：install 若为 `--scope project` 则 `repo/.claude/workflows/`，默认 user 则 `~/.claude/workflows/`。
+3. 将下述脚本写为 `supa-implement-workflow.js`，并以 `Workflow({ name: 'supa-implement-workflow' })` 启动。`args` 以实际 JSON 传入。
+4. 将汇总结果返回会话，进入 **阶段4（门控）**。
 
-## スクリプト雛形
+## 脚本模板
 ```js
 export const meta = {
   name: 'supa-implement-workflow',
-  description: 'red 済みモジュールを並列実装し turbo typecheck test が緑になるまで検証',
+  description: '并行实现已 red 的模块,验证到 turbo typecheck test 变绿为止',
   phases: [{ title: 'Implement' }, { title: 'Verify' }],
 }
 const VERDICT = { type: 'object', properties: { green: { type: 'boolean' }, note: { type: 'string' } }, required: ['green'] }
 const out = await pipeline(args,
-  m => agent(`${m.file} のスタブ本体を実装し ${m.testFile} を green に。JS+JSDoc・ESM。契約(JSDoc)は変えない。throw を残さない。`,
+  m => agent(`实现 ${m.file} 的桩本体并使 ${m.testFile} 变为 green。JS+JSDoc、ESM。不改动契约（JSDoc）。不残留 throw。`,
              { agentType: 'supa-implementer', label: `impl:${m.file}`, phase: 'Implement' }),
-  (_, m) => agent(`${m.file} を検証: 当該 workspace で turbo run typecheck test(無ければ tsc -p jsconfig.json --noEmit と jest)。失敗なら原因を返す。`,
+  (_, m) => agent(`验证 ${m.file}：在该 workspace 执行 turbo run typecheck test（若无则 tsc -p jsconfig.json --noEmit 与 jest）。失败则返回原因。`,
              { agentType: 'supa-implementer', label: `verify:${m.file}`, phase: 'Verify', schema: VERDICT }))
 return { results: out.filter(Boolean) }
 ```
 
-subagent は `agentType: 'supa-implementer'`(内部でも JSDoc / tsc / jest の規律を適用)。
+subagent 为 `agentType: 'supa-implementer'`（内部也应用 JSDoc / tsc / jest 的纪律）。
