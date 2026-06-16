@@ -1,6 +1,6 @@
 # supadevops 规约 — JSDoc 契约优先 + TDD 开发流程
 
-本规约规定 Claude Code 插件 **supadevops** 所施加的开发流程。supadevops 增强 Superpowers，在使用 Claude Code 进行 **Next.js（App Router）/ Expo（React Native）** 开发时，先于实现用 JSDoc 确定契约。对象是 **npm workspaces + turborepo 的 monorepo**（`app/*` 下的各应用 + `package/*` 下的共享库群），`/supa-init` 命令用官方 CLI 初始化各应用以构建对部署保持中立的脚手架（§6）。**插件对部署保持中立**，deploy 到何处由开发者自行裁量（参考结构见 §1.4 末尾）。以契约为起点，**单元（辅助函数、Server Action）采用 test-first（red → green），endpoint、end2end（API、UI）作为实现后的验收测试**来验证（§2.1），并对各阶段施加人工门控。功能新增、缺陷修复以本流程为一个循环进行迭代，每个循环均为回归安全（§2.2）。本书为两部构成：第 I 部为方法论（§1–§4），第 II 部为 supadevops 插件的构建与分发（§5–§8）。
+本规约规定 Claude Code 插件 **supadevops** 所施加的开发流程。supadevops 增强 Superpowers，在使用 Claude Code 进行 **Next.js（App Router）/ Expo（React Native）** 开发时，先于实现用 JSDoc 确定契约。对象是 **npm workspaces + turborepo 的 monorepo**（`app/*` 下的各应用 + `package/*` 下的共享库群），`/supa-init` 命令以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）并确定性重命名，构建对部署保持中立的脚手架（§6）。**插件对部署保持中立**，deploy 到何处由开发者自行裁量（参考结构见 §1.4 末尾）。以契约为起点，**单元（辅助函数、Server Action）采用 test-first（red → green），endpoint、end2end（API、UI）作为实现后的验收测试**来验证（§2.1），并对各阶段施加人工门控。功能新增、缺陷修复以本流程为一个循环进行迭代，每个循环均为回归安全（§2.2）。本书为两部构成：第 I 部为方法论（§1–§4），第 II 部为 supadevops 插件的构建与分发（§5–§8）。
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 1.4 对象 monorepo 的结构
 
-supadevops 以 **npm workspaces + turborepo 的 monorepo** 为单位适用。一个 monorepo 束起多个应用（`app/*`）与共享库群（`package/*`），`/supa-init`（§6）用官方 CLI 与 npm 命令初始化各应用以构建**对部署保持中立的脚手架**。**插件对部署保持中立**，不关注部署目标、网络、服务间认证、应用的角色划分（这些由开发者裁量。本社的参考结构见本节末尾）。
+supadevops 以 **npm workspaces + turborepo 的 monorepo** 为单位适用。一个 monorepo 束起多个应用（`app/*`）与共享库群（`package/*`），`/supa-init`（§6）以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）并由内置脚本确定性重命名，构建**对部署保持中立的脚手架**。**插件对部署保持中立**，不关注部署目标、网络、服务间认证、应用的角色划分（这些由开发者裁量。本社的参考结构见本节末尾）。
 
 #### monorepo 的结构（规范）
 
@@ -74,7 +74,7 @@ supadevops 以 **npm workspaces + turborepo 的 monorepo** 为单位适用。一
 ├─ app/
 │  ├─ next-shop/                   # create-next-app（JS、src/app）
 │  │  ├─ package.json
-│  │  ├─ next.config.js            # transpilePackages: 取入 package/*（§3.7）
+│  │  ├─ next.config.mjs           # transpilePackages: 取入 package/*（§3.7）
 │  │  ├─ jsconfig.json             # checkJs + types:["node"]（§3.5）
 │  │  └─ src/
 │  │     ├─ helper/ action/ component/ type/
@@ -600,13 +600,15 @@ supadevops/                               # GitHub: magcen-zone/supadevops 分�
 ├── hooks/
 │   ├── hooks.json                     # Stop(验证)
 │   └── validate.sh                    # turbo run typecheck test（tsc + jest）
+├── scripts/
+│   └── rename-starter.mjs             # /supa-init 用: supa-starter 模板的确定性重命名引擎
 ├── commands/
 │   ├── supa.md                         # /supa(启动开发流程)
-│   └── supa-init.md                    # /supa-init(monorepo 初始化)
+│   └── supa-init.md                    # /supa-init(取得 supa-starter 模板 + 确定性重命名)
 └── README.md
 ```
 
-以 skill 为核心，内置 subagent / hook / command。`workflow` 不存在于插件的组件定义中，故不内置模板，由各 `supa-<功能>` skill 在需要时生成 `.claude/workflows/supa-<功能>-workflow.js` 以实体化（§5）。`/supa-init` 是命令，不内置模板，委托给官方 CLI（`create-next-app --js`、`create-expo-app`〔默认 TS→JS+JSDoc 化〕）与 npm 命令以生成对部署保持中立的 monorepo（`app/*` + `package/*` + `turbo.json`）。
+以 skill 为核心，内置 subagent / hook / command。`workflow` 不存在于插件的组件定义中，故不内置模板，由各 `supa-<功能>` skill 在需要时生成 `.claude/workflows/supa-<功能>-workflow.js` 以实体化（§5）。`/supa-init` 是命令，以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）、由内置的 `scripts/rename-starter.mjs` 确定性重命名占位名，再 `npm install` + `turbo run typecheck test` 确认为绿。`create-next-app` / `create-expo-app` 与 Expo 的 TS→JS+JSDoc 转换现仅存在于该模板的维护/生成侧（§8），不在用户每次运行时（消除非确定性）。
 
 ---
 
@@ -651,5 +653,5 @@ flowchart TD
 - **hooks** — `hooks/hooks.json`。supadevops 使用 `Stop`（验证），仅执行 `turbo run typecheck test`（tsc + jest）（快速。endpoint/end2end 在阶段4）。命令中可用 `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PROJECT_DIR}`。
 - **分发范围** — `claude plugin install <p>@<mp> --scope user|project`（放置目标、声明以 §7 为正本）。并记 `extraKnownMarketplaces` 即可团队自动解析。
 - **Workflow** — `Workflow({ name })` 解析 `.claude/workflows/`，`Workflow({ scriptPath })` 执行任意 `.js`。`args` 以真实 JSON 传入。
-- **init** — `/supa-init` 不内置模板，委托给官方 CLI 与 npm 命令：root 用 `npm`（`"workspaces": ["app/*","package/*"]` + `package-lock.json` + `node_modules`），next 用 `create-next-app --js --app --src-dir --no-eslint --no-tailwind --no-import-alias --use-npm`（`--yes` 因默认 TS 而不使用）。Expo 在生成 `create-expo-app`（默认 TS+Expo Router）后**转换为 JS+JSDoc**：`.ts/.tsx`→`.js/.jsx`、移除类型注解（JSDoc 化）、`tsconfig.json`→`jsconfig.json`、`metro.config`/`babel.config`→`.cjs`、禁用 typed routes（**风险最高的工序**）。`turbo.json` / `next.config`（`transpilePackages`）等固有配置仅由 plugin 准备。Expo web 以 `app.json` 的 `web.output`（`single` / `static`）选择 SPA / SSG。
+- **init** — `/supa-init` 以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（`degit magcen-zone/supa-starter#vX.Y.Z`），用内置 `scripts/rename-starter.mjs` 把占位名 `next-app` / `expo-app` / `core`（`@app/core`）确定性重命名为项目名（目录 + 文件内 token + `app.json` + 锁文件 workspace 项；并删模板 README/LICENSE），再 `npm install`（非 `npm ci`，以保留外部依赖锁定）+ `turbo run typecheck test` 确认为绿。模板已是 `turbo` 为绿、无 `throw` 桩的实现就绪雏形。**`create-next-app --js` / `create-expo-app`（默认 TS→JS+JSDoc 化：`.ts/.tsx`→`.js/.jsx`、JSDoc 化、`tsconfig`→`jsconfig`、`metro/babel`→`.cjs`、禁用 typed routes）与固有配置（`turbo.json` / `next.config` 的 `transpilePackages` / Expo `web.output`）现只在模板的一次性生成/再生成侧执行**（原最高风险工序移至维护者侧，并有 `turbo typecheck test` 把关）。模板版本由 `/supa-init` 以 tag 固定引用（建议与插件版本/tag 同步）。
 - **中立性** — supadevops 对部署、托管保持中立，不以特定服务（EAS / Vercel / App Hosting / Cloud Run / Firebase Hosting 等）为前提。部署目标、网络、IAM、应用的角色划分由开发者裁量（§1.4 末尾为本社的参考例）。
