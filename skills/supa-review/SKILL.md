@@ -1,6 +1,6 @@
 ---
 name: supa-review
-description: supadevops 阶段5（评审）的并行加速 authoring 技能。当变更文件或评审维度有多个、且用户选择启用时，生成 .claude/workflows/supa-review-workflow.js 并用 supa-reviewer 按文件、按维度并行执行 JS+JSDoc 规约评审。在 supa-tdd 的阶段5、或需要 JS+JSDoc 规约特化的评审时使用。通用代码评审请直接使用 Superpowers，不使用本技能。
+description: 当用户想按 supadevops / JS+JSDoc 项目规约审查代码时使用，尤其要并行覆盖多个文件或多个规约维度的场景。典型意图（即使没点名本技能或阶段5）：检查测试是否混入业务文件、是否残留 .d.ts、tsc/jsconfig 类型规约；契约层是否齐全、契约优先分层；所有路由/画面是否都有 e2e、是否用了 RTL/jsdom 等按代码类别的测试覆盖；文件轻薄度与放置位置。会生成并启动 .claude/workflows/supa-review-workflow.js，用 supa-reviewer 按文件/维度并行评审；也用于 supa-tdd 的阶段5评审。不要用于：与规约无关的通用代码审查、PR 整体逻辑对错、单文件随手看、Python 等非 JS 评审（这些请用 Superpowers）；也不用于修测试、讲解 supa-reviewer 用法。
 ---
 
 # supa-review — 评审阶段的并行 Workflow(authoring)
