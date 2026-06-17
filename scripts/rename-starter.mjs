@@ -2,12 +2,12 @@
 // supadevops — supa-starter 模板的确定性重命名引擎（零依赖 Node）。
 //
 // 由 /supa-init 在 degit 取得模板后调用：将固定占位名
-//   app/next-app, app/expo-app, package/core(@app/core)
+//   app/next-app, app/expo-app, app/gas-app, package/core(@app/core)
 // 按用户项目名重命名（目录名 + 文件内 token + app.json 标识）。
 // 不执行 npm install（由调用方负责）。重命名是机械的、无歧义的、可重复的。
 //
 // 用法:
-//   node rename-starter.mjs <dest> --next <name> --expo <name> --lib <slug>
+//   node rename-starter.mjs <dest> --next <name> --expo <name> --gas <name> --lib <slug>
 //
 // 退出码: 0=成功 / 1=参数或校验失败 / 2=仍有残留占位 token（异常）。
 
@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync, renameSync, readdirSync, statSync, existsS
 import { join, extname } from 'node:path';
 
 /** 占位名（与 supa-starter 模板一致，刻意以 `-app` 结尾 / 带 `@app/` scope 以避免子串误伤）。 */
-const PLACEHOLDER = { next: 'next-app', expo: 'expo-app', libSlug: 'core', libName: '@app/core' };
+const PLACEHOLDER = { next: 'next-app', expo: 'expo-app', gas: 'gas-app', libSlug: 'core', libName: '@app/core' };
 
 /** 不进入的目录。 */
 const SKIP_DIRS = new Set(['node_modules', '.git', '.next', '.expo', '.turbo', 'ios', 'android', '.vscode']);
@@ -35,7 +35,7 @@ const SKIP_FILES = new Set();
 /**
  * 解析 CLI 参数。
  * @param {string[]} argv
- * @returns {{ dest: string, next: string, expo: string, lib: string }}
+ * @returns {{ dest: string, next: string, expo: string, gas: string, lib: string }}
  */
 function parseArgs(argv) {
   const positional = [];
@@ -48,7 +48,7 @@ function parseArgs(argv) {
       positional.push(a);
     }
   }
-  return { dest: positional[0], next: opt.next, expo: opt.expo, lib: opt.lib };
+  return { dest: positional[0], next: opt.next, expo: opt.expo, gas: opt.gas, lib: opt.lib };
 }
 
 /**
@@ -60,8 +60,8 @@ function parseArgs(argv) {
 function requireName(name, label) {
   if (!name) fail(`缺少 ${label}`);
   if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) fail(`${label} 非法（仅允许小写字母/数字/连字符，且不以连字符开头）: ${name}`);
-  if ([PLACEHOLDER.next, PLACEHOLDER.expo, PLACEHOLDER.libSlug].includes(name)) {
-    fail(`${label} 不能等于占位名（next-app/expo-app/core）: ${name}`);
+  if ([PLACEHOLDER.next, PLACEHOLDER.expo, PLACEHOLDER.gas, PLACEHOLDER.libSlug].includes(name)) {
+    fail(`${label} 不能等于占位名（next-app/expo-app/gas-app/core）: ${name}`);
   }
   return name;
 }
@@ -111,18 +111,20 @@ function replaceInFile(filePath, rules) {
 }
 
 function main() {
-  const { dest, next, expo, lib } = parseArgs(process.argv.slice(2));
-  if (!dest) fail('用法: node rename-starter.mjs <dest> --next <name> --expo <name> --lib <slug>');
+  const { dest, next, expo, gas, lib } = parseArgs(process.argv.slice(2));
+  if (!dest) fail('用法: node rename-starter.mjs <dest> --next <name> --expo <name> --gas <name> --lib <slug>');
   if (!existsSync(dest)) fail(`目标目录不存在: ${dest}`);
   const NEXT = requireName(next, '--next');
   const EXPO = requireName(expo, '--expo');
+  const GAS = requireName(gas, '--gas');
   const LIB = requireName(lib, '--lib');
-  if (new Set([NEXT, EXPO, LIB]).size !== 3) fail('--next / --expo / --lib 不能重复');
+  if (new Set([NEXT, EXPO, GAS, LIB]).size !== 4) fail('--next / --expo / --gas / --lib 不能重复');
 
   // 1) 目录重命名（先于内容替换，使路径最终化）。
   const renames = [
     [join(dest, 'app', PLACEHOLDER.next), join(dest, 'app', NEXT)],
     [join(dest, 'app', PLACEHOLDER.expo), join(dest, 'app', EXPO)],
+    [join(dest, 'app', PLACEHOLDER.gas), join(dest, 'app', GAS)],
     [join(dest, 'package', PLACEHOLDER.libSlug), join(dest, 'package', LIB)],
   ];
   for (const [from, to] of renames) {
@@ -136,6 +138,7 @@ function main() {
     [new RegExp(`@app/${PLACEHOLDER.libSlug}`, 'g'), `@app/${LIB}`],
     [new RegExp(`(?<![\\w-])${PLACEHOLDER.next}(?![\\w-])`, 'g'), NEXT],
     [new RegExp(`(?<![\\w-])${PLACEHOLDER.expo}(?![\\w-])`, 'g'), EXPO],
+    [new RegExp(`(?<![\\w-])${PLACEHOLDER.gas}(?![\\w-])`, 'g'), GAS],
   ];
   let changed = 0;
   walk(dest, (p) => {
@@ -168,6 +171,7 @@ function main() {
   const residual = [];
   const wholeNext = new RegExp(`(?<![\\w-])${PLACEHOLDER.next}(?![\\w-])`);
   const wholeExpo = new RegExp(`(?<![\\w-])${PLACEHOLDER.expo}(?![\\w-])`);
+  const wholeGas = new RegExp(`(?<![\\w-])${PLACEHOLDER.gas}(?![\\w-])`);
   walk(dest, (p) => {
     const base = p.slice(dest.length + 1);
     if (SKIP_FILES.has(base.split('/').pop() ?? '')) return;
@@ -175,6 +179,7 @@ function main() {
     const text = readFileSync(p, 'utf8');
     if (wholeNext.test(text)) residual.push(`${base}: ${PLACEHOLDER.next}`);
     if (wholeExpo.test(text)) residual.push(`${base}: ${PLACEHOLDER.expo}`);
+    if (wholeGas.test(text)) residual.push(`${base}: ${PLACEHOLDER.gas}`);
     if (text.includes(PLACEHOLDER.libName)) residual.push(`${base}: ${PLACEHOLDER.libName}`);
   });
   if (residual.length) {
@@ -184,7 +189,7 @@ function main() {
 
   console.log(
     `rename-starter: 完成。app/${PLACEHOLDER.next}→app/${NEXT}, app/${PLACEHOLDER.expo}→app/${EXPO}, ` +
-    `package/${PLACEHOLDER.libSlug}→package/${LIB}（@app/${LIB}）。改动文件 ${changed} 个。` +
+    `app/${PLACEHOLDER.gas}→app/${GAS}, package/${PLACEHOLDER.libSlug}→package/${LIB}（@app/${LIB}）。改动文件 ${changed} 个。` +
     `\n下一步：在 ${dest} 执行 npm install，然后 npx turbo run typecheck test。`,
   );
 }
