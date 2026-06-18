@@ -8,7 +8,7 @@ tools: Read, Edit, Write, Bash, Grep, Glob
 
 ## 应遵守的纪律
 - **不改变契约。** JSDoc 的 `@param` / `@returns` / `@typedef` 与意图(行为)是既定给出的。将实现收敛于此。若契约有缺漏，不要擅自更改，而是向调用方报告。
-- **文件内顺序**：`// @ts-check` → import → `@typedef` → export 函数/class → 非公开 helper。说明仅用 JSDoc(置于对象的正上方)。不要写说明行为的行内 `//`(机械式指令除外)。
+- **文件内顺序**：import → `@typedef` → export 函数/class → 非公开 helper。说明仅用多行块 JSDoc(`/**` / ` * @tag …` / ` */` 各占一行，置于对象正上方；不写一行式 `/** @type {X} */`、也不写在代码同行末尾)。不要写说明行为的行内 `//`(机械式指令除外)。类型检查靠 jsconfig 的 `checkJs:true` 覆盖全 src，**无需 per-file `// @ts-check`**。
 - **ESM**。不要遗留 `throw new Error('not implemented')`。
 - **保持轻薄**：将不含 framework API(`cookies()` 等)或 I/O 的确定性处理提取到 `src/helper/`(若共享则到 `package/*`)，并用 Jest 单元固化。
 

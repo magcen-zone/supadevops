@@ -59,16 +59,14 @@ flowchart TD
 - **公共服务**（自有内部共享）与 **外部服务**（第三方）是不同概念。两者均在测试中 stub/mock。
 
 ## 规约（文件内顺序、测试放置位置、类型检查）
-- **文件内顺序**：`// @ts-check` → import → `@typedef` → export 函数/class → 非公开 helper。说明**仅用 JSDoc**（位于对象的正上方行）。不写说明行为的行内 `//`（例外仅为 `// @ts-check`、`'use server'`/`'use client'`）。
+- **文件内顺序**：import → `@typedef` → export 函数/class → 非公开 helper。说明**仅用多行块 JSDoc**（`/**` / ` * @tag …` / ` */` 各占一行，位于对象正上方；不写一行式 `/** @type {X} */`、也不写在代码同行末尾）。不写说明行为的行内 `//`（例外仅为 `'use server'`/`'use client'`）。
 - **测试放置位置**：不与业务文件混放，使用独立文件。单元置于实现旁的 `<name>.test.js`。endpoint=`src/endpoint/`、end2end（web）=`src/end2end/`（Expo 为 `src/end2end/web/`）、Maestro=`src/end2end/native/*.yaml`。
-- **类型检查**：每个 workspace 的 `jsconfig.json`（`allowJs`/`checkJs`/`noEmit`/`jsx`/`types:["node"]`）。测试类型来自 import（`@jest/globals` / `@playwright/test`）。
+- **类型检查**：每个 workspace 的 `jsconfig.json`（`allowJs`/`checkJs`/`noEmit`/`jsx`/`types`）。`checkJs:true` 已检查 include 内全部 `.js/.jsx`，故**无需 per-file `// @ts-check`**。测试类型来自 import（`@jest/globals` / `@playwright/test`）。
 
 ## 填写示例
 
 **阶段1：契约桩**（`src/helper/order.js`）— 类型与意图写入 JSDoc，本体为 `throw`：
 ```js
-// @ts-check
-
 /**
  * 订单的金额计算、验证辅助函数（纯函数）。
  * @module helper/order
@@ -102,11 +100,13 @@ describe('buildOrder', () => {
 
 **阶段2后半：填入断言得到 red**（`src/helper/order.test.js`）。类型仅标注在复用值（factory）上：
 ```js
-// @ts-check
 import { describe, it, expect } from '@jest/globals';
 import { buildOrder } from './order.js';
 
-/** @param {Partial<import('./order.js').OrderItem>} [o] @returns {import('./order.js').OrderItem} */
+/**
+ * @param {Partial<import('./order.js').OrderItem>} [o]
+ * @returns {import('./order.js').OrderItem}
+ */
 const makeItem = (o = {}) => ({ sku: 'A1', qty: 1, ...o });
 
 describe('buildOrder', () => {
@@ -121,14 +121,14 @@ describe('buildOrder', () => {
 
 **组件 / Server Action 的桩**（props 也用 JSDoc、本体 `throw`）：
 ```jsx
-// @ts-check
-/** @param {{ order: import('@/type/order').Order, onCancel: () => void }} props */
+/**
+ * @param {{ order: import('@/type/order').Order, onCancel: () => void }} props
+ */
 export function OrderCard({ order, onCancel }) {
   throw new Error('not implemented');
 }
 ```
 ```js
-// @ts-check
 'use server';
 /**
  * 将已确定的订单发送至公共服务。
@@ -142,7 +142,6 @@ export async function checkout(items) {
 
 **Server Action 的测试**（作为函数用 Jest、公共/外部服务用 MSW mock）：
 ```js
-// @ts-check
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
@@ -163,7 +162,6 @@ describe('checkout', () => {
 
 **阶段4：endpoint**（`src/endpoint/orders.spec.js`、无浏览器）：
 ```js
-// @ts-check
 import { test, expect } from '@playwright/test';
 test('POST /api/orders 创建订单', async ({ request }) => {
   const res = await request.post('/api/orders', { data: { items: [{ sku: 'A1', qty: 1 }] } });

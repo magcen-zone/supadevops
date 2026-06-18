@@ -240,24 +240,21 @@ flowchart TD
 ### 3.1 文件内的标准顺序
 
 ```
-1. // @ts-check
-2. import
-3. @typedef
-4. export 函数 / class(依赖顺 / 声明顺)
-5. 非公开 helper(末尾，或最初使用处的正下方)
+1. import
+2. @typedef
+3. export 函数 / class(依赖顺 / 声明顺)
+4. 非公开 helper(末尾，或最初使用处的正下方)
 ```
 
 `.jsx` 也为同顺序（组件作为带 props 类型 JSDoc 的 export 函数置于 `4.`）。`5.` 的非公开 helper 是生产代码，不是测试。测试放在另外的文件（§3.4）。
 
-**说明仅以 JSDoc（`/** ... */`）记述，且必须置于对象代码正上方的行（不写在同行末尾）。** 不写说明代码行为的行内注释（`//`）。例外仅为机械式指令（`// @ts-check`、`'use server'` / `'use client'`）。
+**说明仅以 JSDoc（`/** ... */`）记述，且必须为多行块形式（`/**` / ` * @tag …` / ` */` 各占一行）置于对象代码正上方（不写一行式 `/** @type {X} */`，也不写在代码同行末尾）。** 不写说明代码行为的行内注释（`//`）。例外仅为机械式指令（`'use server'` / `'use client'`）。
 
 ### 3.2 契约的记述（阶段1 的输出）
 
 在真实 `.js / .jsx` 以 ESM 直接记入契约与桩（辅助函数等为 `.js`，React 组件为 `.jsx`。组件以 JSDoc 为 props 标注类型，§3.6）。记述各 `@param` / `@returns` / `@throws` 与意图，桩本体为 `throw new Error('not implemented')`。
 
 ```js
-// @ts-check
-
 /**
  * 订单的金额计算、验证辅助函数(纯函数)。
  * @module helper/order
@@ -333,7 +330,6 @@ describe('buildOrder', () => {
 ```
 
 ```js
-// @ts-check
 import { describe, it, expect } from '@jest/globals';
 import { buildOrder } from './order.js';
 
@@ -388,7 +384,7 @@ package/order/src/helper/money.test.js     # Jest 单元
 
 ### 3.5 类型检查
 
-类型检查以**每个工作区的 `jsconfig.json`** 进行（因 monorepo，program 为应用、库单位。以 `turbo run typecheck` 横跨）。在各 `.js / .jsx` 开头放 `// @ts-check`，将各工作区的整个 `src/`（helper / app / endpoint / end2end / component）以一个 program 检查。
+类型检查以**每个工作区的 `jsconfig.json`** 进行（因 monorepo，program 为应用、库单位。以 `turbo run typecheck` 横跨）。靠 `jsconfig.json` 的 **`checkJs: true`** 将各工作区的整个 `src/`（helper / app / endpoint / end2end / component）作为一个 program 检查——`checkJs` 已覆盖 include 内所有 `.js / .jsx`，故**不需要每个文件开头的 `// @ts-check`**（per-file 指令对 `tsc -p jsconfig.json` 这道闸是冗余的）。
 
 - 在 `jsconfig.json` 设置 `allowJs` + `checkJs` + `noEmit` + `jsx`（Next.js 设置）+ **`types: ["node"]`**（向 Next.js 生成的 `jsconfig.json` 加上 `checkJs` / `types`）。验证为 `tsc -p jsconfig.json --noEmit`（`tsc` 不会自动读取 `jsconfig.json`，故 `-p` 必需）。
 - **测试类型统一为 import 来源** — Jest 从 `@jest/globals`、Playwright 从 `@playwright/test` import `test` / `expect`（§3.3）。若在全局 `types` 中同居 jest 与 playwright，二者会扩展 `expect` / `test` 而冲突，故停止全局注入、统一为 import 来源的类型。
@@ -415,7 +411,6 @@ package/order/src/helper/money.test.js     # Jest 单元
 - 组件、Expo 画面的桩也以 JSDoc 为 props 标注类型，本体为 `throw`。Expo 的行为是将 framework 无关逻辑放到 `src/helper`（若共享则 `package/*`）并用 jest-expo 固化，native 画面用 Maestro（本地构建 / 模拟器），web 用 Playwright（`expo export -p web` 或 dev 服务器）做 end2end。另外 `src/endpoint/`、`src/action/` 是将来采用 SSR（`web.output:'server'`）时以与 Next 相同规约（endpoint / Jest）使用的预留位，现状范围内为空即可。
 
 ```jsx
-// @ts-check
 /**
  * @param {{ order: import('@/type/order').Order, onCancel: () => void }} props
  */
@@ -429,7 +424,6 @@ export function OrderCard({ order, onCancel }) {
 Server Action（使用时）像 `src/action/checkout.js` 那样写成轻薄函数，纯粹部分放到辅助函数。它是**被 UI 调用的手段**：例如 checkout 页面的 `<form action={checkout}>` 调用 `checkout()`。若没有表单（UI）则没有调用方，故 Server Action 仅存在于持有 UI 的 next 应用中（不持有画面的 API 专用应用以 `/api/...` 的 Route Handler 公开）。公共服务用 `fetch` 直接调用，测试（`src/action/checkout.test.js`）不做 end2end 而**作为函数用 Jest** 进行，将到公共服务的 HTTP 用 **MSW** mock。
 
 ```js
-// @ts-check
 'use server';
 
 /**
@@ -443,7 +437,6 @@ export async function checkout(items) {
 ```
 
 ```js
-// @ts-check
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';

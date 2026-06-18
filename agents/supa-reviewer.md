@@ -8,10 +8,10 @@ tools: Read, Grep, Glob, Bash
 
 ## 评审维度
 1. **契约优先** — module / class / function / component props / `@typedef` 是否有多层 JSDoc。`@param` / `@returns` / `@throws` 与一行的意图是否齐备。未实现是否以 `throw` 桩表达，是否不存在进度的双重管理。
-2. **类型** — `// @ts-check`、每个工作区的 `jsconfig`(`allowJs`/`checkJs`/`noEmit`/`jsx`/`types`)、是否未创建 `.d.ts`。测试类型是否统一由 import 提供(`@jest/globals` / `@playwright/test`)。
+2. **类型** — 每个工作区的 `jsconfig`(`allowJs`/`checkJs:true`/`noEmit`/`jsx`/`types`)以 `checkJs` 检查全 `src`(无需 per-file `// @ts-check`)、是否未创建 `.d.ts`。测试类型是否统一由 import 提供(`@jest/globals` / `@playwright/test`)。
 3. **按代码类别的测试** — 助手·Server Action·Expo 逻辑·共享库=Jest(Expo 为 jest-expo)、Route Handler=endpoint、UI=end2end(web/Expo web=Playwright、Expo native=Maestro)。全部 next 路由(page/layout)与 Expo 全部画面是否为 end2end 对象。是否未使用 RTL/jsdom。
 4. **放置位置** — 测试为独立文件(`.test.js` / `.spec.js` / Maestro `.yaml`)。是否未在业务文件中混入测试。Maestro 是否在 `src/end2end/native/`。
-5. **文件内规约** — 标准顺序，说明仅用 JSDoc·置于对象的正上方，无说明行为的行内 `//`，ESM。
+5. **文件内规约** — 标准顺序，说明仅用多行块 JSDoc·置于对象正上方(无一行式 `/** @type {X} */`)，无说明行为的行内 `//`，ESM。
 6. **轻薄度** — Route Handler / Server Action / 组件是否轻薄，确定性处理是否已提取到 helper。共享 `package/*` 中是否未混入 React DOM 专用 `.jsx`。
 7. **中立性** — 插件规范部分是否未混入对特定部署目标(App Hosting / Cloud Run / EAS / Vercel 等)的依赖(部署由开发者裁量)。
 
@@ -21,7 +21,7 @@ tools: Read, Grep, Glob, Bash
 ## 输出示例
 ```
 1. 契约优先 — OK
-2. 类型 — [重] app/next-shop/src/helper/order.js:1 — 无 `// @ts-check` → 在开头添加。
+2. 类型 — [重] app/next-shop/jsconfig.json — 缺 `checkJs:true` → 添加(否则 `.js` 不被 `tsc` 检查)。
 3. 按代码类别的测试 — [中] app/next-shop/src/app/checkout/page.jsx — 未创建 end2end → 添加 src/end2end/checkout.spec.js。
 4. 放置位置 — OK
 5. 文件内规约 — [轻] order.js:12 — 说明行为的行内 // → 移到 JSDoc 或删除。
