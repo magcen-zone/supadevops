@@ -1,6 +1,6 @@
 ---
 name: supa-implementer
-description: supadevops 的实现·验收测试生成 subagent。实现已 red 模块的桩本体使 turbo typecheck test 变绿，或生成 endpoint/end2end(Playwright/Maestro)的验收测试。在阶段3(实现)·阶段4(验收)想以模块为单位委托实现或测试生成时使用(也作为 supa-implement / supa-acceptance Workflow 的 agentType 起动)。
+description: supadevops 的实现·验收测试生成 subagent。实现已 red 模块的桩本体使 npm run check 变绿，或生成 endpoint/end2end(Playwright/Maestro)的验收测试。在阶段3(实现)·阶段4(验收)想以模块为单位委托实现或测试生成时使用(也作为 supa-implement / supa-acceptance Workflow 的 agentType 起动)。
 tools: Read, Edit, Write, Bash, Grep, Glob
 ---
 
@@ -14,7 +14,7 @@ tools: Read, Edit, Write, Bash, Grep, Glob
 
 ## 实现任务(阶段3)
 1. 实现目标 `.js/.jsx` 的桩本体。
-2. 在相应工作区验证：`npx turbo run typecheck test --filter <workspace>`(若无则 `tsc -p jsconfig.json --noEmit` 与 `NODE_OPTIONS=--experimental-vm-modules jest`)。
+2. 在相应工作区验证：`npm run typecheck -w <workspace> && npm run test -w <workspace>`(或根 `npm run check` 跑全 workspace)。
 3. 若红则定位原因并修复，反复直至变绿。最后返回“绿/失败 + 要点”。
 
 ## 验收测试生成任务(阶段4)
@@ -29,5 +29,5 @@ tools: Read, Edit, Write, Bash, Grep, Glob
 
 ## 返回值示例
 这将直接成为返回值。请简洁：
-- 成功：`green。app/next-shop/src/helper/order.js 已实现。turbo run typecheck test --filter ./app/next-shop 绿(tsc 0 / jest 2 passed)。throw 已除去。`
+- 成功：`green。app/next-shop/src/helper/order.js 已实现。npm run typecheck/test -w app/next-shop 绿(tsc 0 / jest 2 passed)。throw 已除去。`
 - 失败：`红。pricing.test.js“折扣上限”处期待 900 / 实际 1000。原因是 clamp 遗漏。修复尝试 2 次后仍未解决，需确认方针。`

@@ -18,4 +18,4 @@ argument-hint: [功能或缺陷的简要说明（可选）]
 
 在实现阶段(3 实现 / 4 受入 / 5 评审)中,若独立模块达到 3 个以上且用户希望,则为并行加速建议使用 `supa-implement` / `supa-acceptance` / `supa-review` 技能(选择启用(opt-in)。1 Workflow = 1 阶段。由会话侧维持人工门控)。
 
-若是尚无 npm workspaces + turborepo monorepo 的新建项目,先引导至 **`/supa-init`**。规约遵循 `supa-tdd` 技能(本命令是其入口)。
+若是尚无 npm workspaces monorepo 的新建项目,先引导至 **`/supa-init`**。规约遵循 `supa-tdd` 技能(本命令是其入口)。

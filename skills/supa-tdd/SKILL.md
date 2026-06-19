@@ -1,6 +1,6 @@
 ---
 name: supa-tdd
-description: 在 Next.js（App Router）/ Expo（React Native）的 npm workspaces + turborepo monorepo 中，先于实现确定 JSDoc 契约，并以 5 阶段（Plan→Test→Implement→验收→Finish）+人工门控推进的 supadevops 契约优先 TDD 开发流。当添加新功能、修复缺陷、重构，或新建/变更辅助函数/Route Handler/Server Action/组件/Expo 画面/共享库时，即使未被明确要求也必须使用本技能。它施加 JSDoc 契约、tsc/jest/Playwright/Maestro、测试放置位置、类型检查的纪律，并增强 Superpowers。对于非 supadevops 对象的仓库，或不伴随设计的一行修改，不使用本技能。
+description: 在 Next.js（App Router）/ Expo（React Native）的 npm workspaces monorepo 中，先于实现确定 JSDoc 契约，并以 5 阶段（Plan→Test→Implement→验收→Finish）+人工门控推进的 supadevops 契约优先 TDD 开发流。当添加新功能、修复缺陷、重构，或新建/变更辅助函数/Route Handler/Server Action/组件/Expo 画面/共享库时，即使未被明确要求也必须使用本技能。它施加 JSDoc 契约、tsc/jest/Playwright/Maestro、测试放置位置、类型检查的纪律，并增强 Superpowers。对于非 supadevops 对象的仓库，或不伴随设计的一行修改，不使用本技能。
 ---
 
 # supadevops — JSDoc 契约优先 + TDD 开发流
@@ -10,7 +10,7 @@ description: 在 Next.js（App Router）/ Expo（React Native）的 npm workspac
 ## 前提
 - **JavaScript + JSDoc**（不写 TypeScript 构文）。类型全部使用 JSDoc。不创建 `.d.ts`。类型检查为 `tsc -p jsconfig.json --noEmit`。
 - **ESM**（各 workspace 的 `package.json` 中 `"type":"module"`）。
-- 对象为 **npm workspaces + turborepo 的 monorepo**。`app/next-<名>`（Next.js `src/app`）、`app/expo-<名>`（Expo Router 同为 `src/app`）、`package/*`（共享库＝与平台无关的逻辑/类型）。若无则先执行 **`/supa-init`**。
+- 对象为 **npm workspaces 的 monorepo**（无 turborepo；gate 为 `npm run check`）。`app/next-<名>`（Next.js `src/app`）、`app/expo-<名>`（Expo Router 同为 `src/app`）、`package/*`（共享库＝与平台无关的逻辑/类型）。若无则先执行 **`/supa-init`**。
 - 测试：单元 = Jest（Expo 为 jest-expo）/ endpoint = Playwright `request` / end2end = Playwright（web、Expo web）、Maestro（Expo native）。
 
 ## 设计原则
@@ -199,11 +199,11 @@ flowchart TD
     FIX --> T2["阶段2 复现缺陷 red"]
     T --> IMP["阶段3 实现 green"]
     T2 --> IMP
-    IMP --> REG["阶段4-5<br/>turbo typecheck test + endpoint/end2end 做回归确认"]
+    IMP --> REG["阶段4-5<br/>npm run check + endpoint/end2end 做回归确认"]
     REG --> REQ
 ```
 
-每个功能请求、缺陷修复都走完整流的一轮循环。**新功能**＝契约→red→green→回归确认。**缺陷修复**＝确认既有契约（若有缺口则增强 JSDoc）→复现缺陷的 red→修复 green→回归确认。完成前让 **`turbo run typecheck test`**（全 workspace 的 tsc + jest）转绿（Stop 钩子自动确认）。endpoint/end2end 在阶段4执行（不计入 Stop）。修复的缺陷以 red→green 测试固化。
+每个功能请求、缺陷修复都走完整流的一轮循环。**新功能**＝契约→red→green→回归确认。**缺陷修复**＝确认既有契约（若有缺口则增强 JSDoc）→复现缺陷的 red→修复 green→回归确认。完成前让 **`npm run check`**（= typecheck && test，经 npm workspaces 跑全 workspace 的 tsc + jest）转绿（Stop 钩子自动确认）。endpoint/end2end 在阶段4执行（不计入 Stop）。修复的缺陷以 red→green 测试固化。
 
 ## 与 Superpowers 的关系 / 驱动角色
 - 纪律（JSDoc 契约优先 + Superpowers TDD）**始终并用**。

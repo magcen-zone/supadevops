@@ -1,6 +1,6 @@
 # supadevops 规约 — JSDoc 契约优先 + TDD 开发流程
 
-本规约规定 Claude Code 插件 **supadevops** 所施加的开发流程。supadevops 增强 Superpowers，在使用 Claude Code 进行 **Next.js（App Router）/ Expo（React Native）** 开发时，先于实现用 JSDoc 确定契约。对象是 **npm workspaces + turborepo 的 monorepo**（`app/*` 下的各应用 + `package/*` 下的共享库群），`/supa-init` 命令以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）并确定性重命名，构建对部署保持中立的脚手架（§6）。**插件对部署保持中立**，deploy 到何处由开发者自行裁量（参考结构见 §1.4 末尾）。以契约为起点，**单元（辅助函数、Server Action）采用 test-first（red → green），endpoint、end2end（API、UI）作为实现后的验收测试**来验证（§2.1），并对各阶段施加人工门控。功能新增、缺陷修复以本流程为一个循环进行迭代，每个循环均为回归安全（§2.2）。本书为两部构成：第 I 部为方法论（§1–§4），第 II 部为 supadevops 插件的构建与分发（§5–§8）。
+本规约规定 Claude Code 插件 **supadevops** 所施加的开发流程。supadevops 增强 Superpowers，在使用 Claude Code 进行 **Next.js（App Router）/ Expo（React Native）** 开发时，先于实现用 JSDoc 确定契约。对象是 **npm workspaces 的 monorepo**（`app/*` 下的各应用 + `package/*` 下的共享库群），`/supa-init` 命令以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）并确定性重命名，构建对部署保持中立的脚手架（§6）。**插件对部署保持中立**，deploy 到何处由开发者自行裁量（参考结构见 §1.4 末尾）。以契约为起点，**单元（辅助函数、Server Action）采用 test-first（red → green），endpoint、end2end（API、UI）作为实现后的验收测试**来验证（§2.1），并对各阶段施加人工门控。功能新增、缺陷修复以本流程为一个循环进行迭代，每个循环均为回归安全（§2.2）。本书为两部构成：第 I 部为方法论（§1–§4），第 II 部为 supadevops 插件的构建与分发（§5–§8）。
 
 ---
 
@@ -14,7 +14,7 @@
 |---|---|
 | 语言、类型 | JavaScript + JSDoc。类型全部以 JSDoc（`@typedef` / `@param` / `@returns` 等）记述。不创建 `.d.ts`。类型检查用 `tsc`（不输出） |
 | 模块 | ESM（`import` / `export`，`package.json` 中 `"type": "module"`） |
-| 仓库形态 | **npm workspaces + turborepo 的 monorepo**。root 有 `package.json`（`"workspaces": ["app/*", "package/*"]`）/ `package-lock.json` / `turbo.json` / `node_modules`（主要 hoist 到 root）。`app/*` 放各应用，`package/*` 放共享库群（结构见 §1.4） |
+| 仓库形态 | **npm workspaces 的 monorepo**。root 有 `package.json`（`"workspaces": ["app/*", "package/*"]` + scripts）/ `package-lock.json` / `node_modules`（主要 hoist 到 root）。`app/*` 放各应用，`package/*` 放共享库群（结构见 §1.4） |
 | 对象 | 适用 supadevops 的 monorepo。可并置 `app/next-<名>`（Next.js `src/app`）与 `app/expo-<名>`（Expo）。契约、验证施加于全部应用、全部代码（按代码种别的手段见 §3.6，结构见 §1.4）。**插件对部署保持中立**（部署目标由开发者裁量，§1.4 末尾为参考） |
 | 目录 | 各 Next.js 应用为 `src/` 结构：`src/helper/`（纯函数）/ `src/action/`（Server Action，使用时）/ `src/component/`（组件）/ `src/type/`（共享 `@typedef`）/ `src/app/`（page、layout、`api/**/route.js`）。Expo 应用以 Expo Router（`app/`）+ `src/helper` 等分离逻辑。`package/*` 的各共享库**仅含与平台无关的逻辑、类型**（§3.6）。测试见 §3.4 |
 | 测试 | 单元 = Jest（Expo 为 jest-expo），endpoint = Playwright `request`，end2end = Playwright（web、Expo web）/ Maestro（Expo native） |
@@ -44,7 +44,7 @@
 - **Server Action** — 带有 `'use server'` 的函数。从 React 的表单/客户端调用的 **UI 变更手段**，**仅存在于持有 UI（表单）的 next 应用中**（是否使用为可选。默认的变更系统是 Route Handler）。汇总于 `src/action/`，作为函数以 Jest（公共服务、外部服务的 HTTP 用 MSW mock）验证（纯粹部分提取到辅助函数）。
 - **公共服务** — 自有内部共享的**内部**服务（= §1.4 参考的 middle office）。由 Route Handler（BFF）代理调用。测试中以 stub 替换（endpoint 用 env stub，Server Action 用 MSW）。实体、放置、部署不在插件关注范围（开发者裁量。参考见 §1.4 末尾）。
 - **外部服务** — **第三方**的外部服务。由 Route Handler / Server Action 调用。测试中以 stub / mock 替换。本书中并记“公共服务、外部服务”的地方指二者。
-- **monorepo** — 用 npm workspaces + turborepo 将多个应用（`app/*`）与共享库群（`package/*`）束于一仓库的结构（§1.4）。turbo 跨工作区执行并缓存任务（build / dev / lint / typecheck / test）。
+- **monorepo** — 用 npm workspaces 将多个应用（`app/*`）与共享库群（`package/*`）束于一仓库的结构（§1.4）。任务（typecheck / test / lint / build）以 npm workspaces（`npm run <task> --workspaces --if-present`）横跨执行，gate 为 `npm run check`（= typecheck && test）。无 turborepo（JS+JSDoc 无构建产物、全量 sub-second）。
 - **Expo 应用** — Expo（React Native）制的应用（`app/expo-<名>`）。从一份代码库获得 **native**（iOS / Android）与 **web**（`expo export -p web`。以 `web.output` 得 SPA / SSG）的 build 输出（deploy 目标插件不关注）。
 - **endpoint** — 用 Playwright `request` 验证 Route Handler（API）的测试（无浏览器，公共服务、外部服务在 dev 服务器上 stub）。放置见 §3.4。
 - **end2end** — 验证 UI / 浏览器、画面流程的测试（web、Expo web 用 Playwright，Expo native 用 Maestro）。放置见 §3.4。
@@ -55,22 +55,21 @@
 
 ### 1.4 对象 monorepo 的结构
 
-supadevops 以 **npm workspaces + turborepo 的 monorepo** 为单位适用。一个 monorepo 束起多个应用（`app/*`）与共享库群（`package/*`），`/supa-init`（§6）以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）并由内置脚本确定性重命名，构建**对部署保持中立的脚手架**。**插件对部署保持中立**，不关注部署目标、网络、服务间认证、应用的角色划分（这些由开发者裁量。本社的参考结构见本节末尾）。
+supadevops 以 **npm workspaces 的 monorepo** 为单位适用。一个 monorepo 束起多个应用（`app/*`）与共享库群（`package/*`），`/supa-init`（§6）以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）并由内置脚本确定性重命名，构建**对部署保持中立的脚手架**。**插件对部署保持中立**，不关注部署目标、网络、服务间认证、应用的角色划分（这些由开发者裁量。本社的参考结构见本节末尾）。
 
 #### monorepo 的结构（规范）
 
-- root 为 npm workspaces（`"workspaces": ["app/*", "package/*"]`）+ turborepo。`turbo.json` 跨工作区执行并缓存 build / dev / lint / typecheck / test。
+- root 为 npm workspaces（`"workspaces": ["app/*", "package/*"]`）。root `package.json` 的 scripts 以 `npm run <task> --workspaces --if-present` 横跨执行 typecheck / test / lint / build，gate 为 `npm run check`（= typecheck && test）。**无 turborepo**（JS+JSDoc 无构建产物、全量 sub-second）。
 - `app/*` 放各应用。可并置 `app/next-<名>`（Next.js `src/app`）、`app/expo-<名>`（Expo），并按需放多个（API 专用的 next 也同列。插件不区分角色）。
 - `package/*` 放共享库群（不限于一个）。各库**仅含与平台无关的逻辑、类型**（helper / type / hooks / API 客户端）。由于可能被 Next.js（React DOM）与 Expo（React Native）双方 import，故不放 React DOM 专用 `.jsx`（§3.6）。
 - 各应用、各库持有自己的 `package.json`（仅自己的依赖）、`jsconfig.json`（§3.5），内部遵循 §1.1 的目录规约。`package.json` / `package-lock.json` / `node_modules` 由 **npm 生成**（不手写）。`node_modules` 主要 hoist 到 root。
 - build / export（dev、测试用）：Expo native 用 `expo prebuild` + `expo run:ios` / `run:android`（本地构建），Expo web 用 `expo export -p web`（以 `app.json` 的 `web.output` 选 `single`=SPA / `static`=SSG。`server`〔SSR/API routes〕现状超出范围〔将来支持。预留 `src/endpoint/`、`src/action/`〕），Next.js 用 `next build`。**成果物 deploy 到何处插件不关注**。
 
 ```
-<repo>/                            # monorepo（npm workspaces + turborepo）
-├─ package.json                    # "type":"module", "workspaces":["app/*","package/*"]
+<repo>/                            # monorepo（npm workspaces）
+├─ package.json                    # "type":"module", workspaces + scripts(typecheck/test/check/build)
 ├─ package-lock.json               # npm 生成
 ├─ node_modules/                   # hoisted（主要在 root）
-├─ turbo.json                      # build/dev/lint/typecheck/test 的任务管线
 ├─ app/
 │  ├─ next-shop/                   # create-next-app（JS、src/app）
 │  │  ├─ package.json              # "type":"module"
@@ -243,7 +242,7 @@ flowchart TD
 - **缺陷修复** — 确认既有契约（若不足则增强 JSDoc），加入复现缺陷的 red，修复后 green，回归确认。
 - 测试不丢弃，作为回归套件累积，每个循环全量执行。
 - 回归安全由下列保证：
-  - 在完成前使 `turbo run typecheck test`（全工作区的 `tsc -p jsconfig.json --noEmit` + `jest`〔含 jest-expo〕）变绿（`Stop` 钩子自动确认。§6）。endpoint、end2end（Playwright / Maestro）较重且非交互，故不纳入 Stop，在阶段4 验收（+可选的 CI）中执行。
+  - 在完成前使 `npm run check`（= typecheck && test，经 npm workspaces 跑全工作区的 `tsc -p jsconfig.json --noEmit` + `jest`〔含 jest-expo〕）变绿（`Stop` 钩子自动确认。§6）。endpoint、end2end（Playwright / Maestro）较重且非交互，故不纳入 Stop，在阶段4 验收（+可选的 CI）中执行。
   - 修复的缺陷以 red→green 测试恒久化，防止复发。
 
 ---
@@ -371,7 +370,7 @@ describe('buildOrder', () => {
 - **单元（Jest）** — 在实现文件旁放 `<name>.test.js`（辅助函数 `src/helper/order.js` ↔ `src/helper/order.test.js`，Server Action `src/action/checkout.js` ↔ `src/action/checkout.test.js`。Expo 逻辑用 jest-expo）。组件 / 画面不持有单元测试，行为以 end2end 验证（§3.6）。
 - **endpoint（Playwright）** — 放于各 next 应用的 `src/endpoint/`（定义见 §1.3）。
 - **end2end（web=Playwright）** — next 应用为 `src/end2end/`，Expo 应用为 `src/end2end/web/`（Expo 因 web/native 两个 runner 而将 `end2end/` 分割）。定义见 §1.3。
-- **end2end（native=Maestro）** — 在 `app/expo-<名>/src/end2end/native/` 放 Maestro 流程（`*.yaml`）（`.yaml` 不在 tsc/jest 对象内）。对以 `expo prebuild` + `expo run` 导入模拟器的应用执行 `maestro test app/expo-<名>/src/end2end/native`（不纳入 `turbo run test`，在阶段4 单独执行）。Maestro 流程因是 test DSL 而不在 house-rule“YAML 以 JSON 语法书写”的对象内（idiomatic Maestro YAML）。
+- **end2end（native=Maestro）** — 在 `app/expo-<名>/src/end2end/native/` 放 Maestro 流程（`*.yaml`）（`.yaml` 不在 tsc/jest 对象内）。对以 `expo prebuild` + `expo run` 导入模拟器的应用执行 `maestro test app/expo-<名>/src/end2end/native`（不纳入 `npm run check`，在阶段4 单独执行）。Maestro 流程因是 test DSL 而不在 house-rule“YAML 以 JSON 语法书写”的对象内（idiomatic Maestro YAML）。
 
 ```
 app/next-shop/src/type/order.js            # 共有型(@typedef)
@@ -397,7 +396,7 @@ package/order/src/helper/money.test.js     # Jest 单元
 
 ### 3.5 类型检查
 
-类型检查以**每个工作区的 `jsconfig.json`** 进行（因 monorepo，program 为应用、库单位。以 `turbo run typecheck` 横跨）。靠 `jsconfig.json` 的 **`checkJs: true`** 将各工作区的整个 `src/`（helper / app / endpoint / end2end / component）作为一个 program 检查——`checkJs` 已覆盖 include 内所有 `.js / .jsx`，故 include 内**不需要每个文件开头的 `// @ts-check`**。本规范**完全不使用 per-file `// @ts-check`**（统一由 `checkJs` 把关）：include 之外的配置/脚本（`jest.config.js` / `next.config.js` / `playwright.config.js` / `babel`·`metro.config.cjs` 等）不纳入类型检查（trivial，可接受）。**扩展名规约：ESM 为默认——`type:module` 下一律 `.js`；`.mjs` 仅用于不被 `type:module` 覆盖的独立脚本（如插件的 `scripts/*.mjs`）；`.cjs` 仅用于「同步加载、不接受 ESM」的工具配置——Expo 的 `babel.config`（Babel 同步加载 ESM 会抛 "only supported when running Babel asynchronously"）与 `metro.config`（Metro 同步 require）。**
+类型检查以**每个工作区的 `jsconfig.json`** 进行（因 monorepo，program 为应用、库单位。以 `npm run typecheck`〔npm workspaces〕横跨）。靠 `jsconfig.json` 的 **`checkJs: true`** 将各工作区的整个 `src/`（helper / app / endpoint / end2end / component）作为一个 program 检查——`checkJs` 已覆盖 include 内所有 `.js / .jsx`，故 include 内**不需要每个文件开头的 `// @ts-check`**。本规范**完全不使用 per-file `// @ts-check`**（统一由 `checkJs` 把关）：include 之外的配置/脚本（`jest.config.js` / `next.config.js` / `playwright.config.js` / `babel`·`metro.config.cjs` 等）不纳入类型检查（trivial，可接受）。**扩展名规约：ESM 为默认——`type:module` 下一律 `.js`；`.mjs` 仅用于不被 `type:module` 覆盖的独立脚本（如插件的 `scripts/*.mjs`）；`.cjs` 仅用于「同步加载、不接受 ESM」的工具配置——Expo 的 `babel.config`（Babel 同步加载 ESM 会抛 "only supported when running Babel asynchronously"）与 `metro.config`（Metro 同步 require）。**
 
 - 在 `jsconfig.json` 设置 `allowJs` + `checkJs` + `noEmit` + `jsx`（Next.js 设置）+ **`types: ["node"]`**（向 Next.js 生成的 `jsconfig.json` 加上 `checkJs` / `types`）。验证为 `tsc -p jsconfig.json --noEmit`（`tsc` 不会自动读取 `jsconfig.json`，故 `-p` 必需）。
 - **测试类型统一为 import 来源** — Jest 从 `@jest/globals`、Playwright 从 `@playwright/test` import `test` / `expect`（§3.3）。若在全局 `types` 中同居 jest 与 playwright，二者会扩展 `expect` / `test` 而冲突，故停止全局注入、统一为 import 来源的类型。
@@ -472,7 +471,7 @@ describe('checkout', () => {
 
 实现时所需的、经过验证的最小配置：
 
-- **turbo.json** — 定义任务 `typecheck` / `test` / `lint` / `build` / `dev`。`typecheck` 为各 workspace 的 `tsc -p jsconfig.json --noEmit`，`test` 为各 workspace 的 `jest`。以 `dependsOn` / `outputs` 缓存。回归确认为 `turbo run typecheck test`（Stop 钩子执行。§6）。
+- **root `package.json` scripts（无 turborepo）** — `typecheck` / `test` / `lint` / `build` 为 `npm run <task> --workspaces --if-present`（各 workspace 的 `tsc -p jsconfig.json --noEmit` / `jest` 等），`check` = `typecheck && test`。JS+JSDoc 无构建产物（tsc `--noEmit` + jest 直跑）、gate 全量 sub-second，故不引入 turbo 的缓存/并行。回归确认为 `npm run check`（Stop 钩子执行。§6）。
 - **Next.js 的 workspace 取入** — 在 `next.config` 放 `transpilePackages: ['<package/* 的 name>']`（为 import 未转译的共享库所必需）。
 - **Jest × ESM** — 因 `"type":"module"`，以 `NODE_OPTIONS=--experimental-vm-modules` 执行。next / `package/*` 用原生 Jest，Expo 用 `jest-expo` preset。
 - **Expo × ESM** — 随 `"type":"module"` 统一，Metro / Babel 配置设为 `metro.config.cjs` / `babel.config.cjs`（CommonJS）（若为 `.js` 则被当作 ESM 而损坏）。
@@ -543,7 +542,7 @@ flowchart TB
 
 ## 5. Workflow 集成（实现阶段的并行加速）
 
-supadevops 定义 3 个 Workflow，用于并行化不夹入人工门控的执行阶段（3 实现 / 4 验收 / 5 评审）。Workflow 是 Claude Code 本体功能，运行中不接受人工输入，故设为 1 Workflow = 1 阶段，人工门控由会话侧（skill）维持。在 monorepo 中将并行单位设为工作区内的模块 / 路由 / 画面，验证用 `turbo` 的任务进行。
+supadevops 定义 3 个 Workflow，用于并行化不夹入人工门控的执行阶段（3 实现 / 4 验收 / 5 评审）。Workflow 是 Claude Code 本体功能，运行中不接受人工输入，故设为 1 Workflow = 1 阶段，人工门控由会话侧（skill）维持。在 monorepo 中将并行单位设为工作区内的模块 / 路由 / 画面，验证用各 workspace 的 `typecheck`/`test`（npm workspaces）进行。
 
 | Workflow 文件 | 阶段 | 并行单位 |
 |---|---|---|
@@ -581,7 +580,7 @@ export const meta = {
 const out = await pipeline(args,
   m => agent(`实现 ${m.file} 的桩本体并使 ${m.testFile} 转 green。ESM、不残留 throw。`,
              { agentType: 'supa-implementer', label: `impl:${m.file}`, phase: 'Implement' }),
-  (_, m) => agent(`验证 ${m.file}: 在该 workspace 执行 turbo run typecheck test(jest + tsc)。失败则返回原因。`,
+  (_, m) => agent(`验证 ${m.file}: 执行 npm run typecheck -w <ws> && npm run test -w <ws>(jest + tsc)。失败则返回原因。`,
              { label: `verify:${m.file}`, phase: 'Verify', schema: VERDICT }))
 return { results: out.filter(Boolean) }
 ```
@@ -605,7 +604,7 @@ supadevops/                               # GitHub: magcen-zone/supadevops 分�
 │   └── supa-reviewer.md                # 负责评审
 ├── hooks/
 │   ├── hooks.json                     # Stop(验证)
-│   └── validate.sh                    # turbo run typecheck test（tsc + jest）
+│   └── validate.sh                    # npm run check（tsc + jest）
 ├── scripts/
 │   └── rename-starter.mjs             # /supa-init 用: supa-starter 模板的确定性重命名引擎
 ├── commands/
@@ -614,7 +613,7 @@ supadevops/                               # GitHub: magcen-zone/supadevops 分�
 └── README.md
 ```
 
-以 skill 为核心，内置 subagent / hook / command。`workflow` 不存在于插件的组件定义中，故不内置模板，由各 `supa-<功能>` skill 在需要时生成 `.claude/workflows/supa-<功能>-workflow.js` 以实体化（§5）。`/supa-init` 是命令，以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）、由内置的 `scripts/rename-starter.mjs` 确定性重命名占位名，再 `npm install` + `turbo run typecheck test` 确认为绿。`create-next-app` / `create-expo-app` 与 Expo 的 TS→JS+JSDoc 转换现仅存在于该模板的维护/生成侧（§8），不在用户每次运行时（消除非确定性）。`app/gas-app`（Google Apps Script，与 next/expo 同构：`src/app` 为 push 入口）则为 `src/app` 的薄壳 GAS 全局脚本（doGet/触发器）+ 业务逻辑置于 `src/helper`（Jest 固化）经 `vendor-pack.js` re-export 由 esbuild 打包为 `src/app/vendor.js` + clasp push `src/app`，无 create-* 工序。
+以 skill 为核心，内置 subagent / hook / command。`workflow` 不存在于插件的组件定义中，故不内置模板，由各 `supa-<功能>` skill 在需要时生成 `.claude/workflows/supa-<功能>-workflow.js` 以实体化（§5）。`/supa-init` 是命令，以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）、由内置的 `scripts/rename-starter.mjs` 确定性重命名占位名，再 `npm install` + `npm run check` 确认为绿。`create-next-app` / `create-expo-app` 与 Expo 的 TS→JS+JSDoc 转换现仅存在于该模板的维护/生成侧（§8），不在用户每次运行时（消除非确定性）。`app/gas-app`（Google Apps Script，与 next/expo 同构：`src/app` 为 push 入口）则为 `src/app` 的薄壳 GAS 全局脚本（doGet/触发器）+ 业务逻辑置于 `src/helper`（Jest 固化）经 `vendor-pack.js` re-export 由 esbuild 打包为 `src/app/vendor.js` + clasp push `src/app`，无 create-* 工序。
 
 ---
 
@@ -656,8 +655,8 @@ flowchart TD
 - **plugin.json** — `name` 必需。依赖为 `dependencies: [{ "name": "superpowers" }]`（字符串 `"superpowers"` 亦可）。
 - **marketplace.json** — `name / owner / plugins[]`。`source` 必须以 `./` 开头的相对路径（与根同居为 `"./"`）。推荐 `metadata.description`。
 - **组件** — `skills / agents / hooks / commands / .mcp.json / .lsp.json / monitors / output-styles`（不含 `workflows`）。
-- **hooks** — `hooks/hooks.json`。supadevops 使用 `Stop`（验证），仅执行 `turbo run typecheck test`（tsc + jest）（快速。endpoint/end2end 在阶段4）。命令中可用 `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PROJECT_DIR}`。
+- **hooks** — `hooks/hooks.json`。supadevops 使用 `Stop`（验证），仅执行 `npm run check`（tsc + jest）（快速。endpoint/end2end 在阶段4）。命令中可用 `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PROJECT_DIR}`。
 - **分发范围** — `claude plugin install <p>@<mp> --scope user|project`（放置目标、声明以 §7 为正本）。并记 `extraKnownMarketplaces` 即可团队自动解析。
 - **Workflow** — `Workflow({ name })` 解析 `.claude/workflows/`，`Workflow({ scriptPath })` 执行任意 `.js`。`args` 以真实 JSON 传入。
-- **init** — `/supa-init` 以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（`degit magcen-zone/supa-starter#vX.Y.Z`），用内置 `scripts/rename-starter.mjs` 把占位名 `next-app` / `expo-app` / `gas-app` / `core`（`@app/core`）确定性重命名为项目名（目录 + 文件内 token + `app.json` + 锁文件 workspace 项；并删模板 README/LICENSE），再 `npm install`（非 `npm ci`，以保留外部依赖锁定）+ `turbo run typecheck test` 确认为绿。模板已是 `turbo` 为绿、无 `throw` 桩的实现就绪雏形。**`app/gas-app`（Google Apps Script，结构与 next/expo 统一）**：`src/app` 为 push 目标——手写 GAS 全局脚本（无模块语法）的薄壳入口 + `appsscript.json`；业务逻辑置于 `src/helper`·`src/action` 用 Jest 固化（与 next/expo 同一 TDD），连同 workspace `@app/*` + npm 依赖在 `vendor-pack.js` 单文件以命名空间声明（类型自动追従），经 esbuild 打包为 `src/app/vendor.js`（global `Vendor`，运行时经 `deps()` 访问）、`clasp` push `src/app`；含 placeholder `scriptId` 的 `.clasp.json`（`rootDir:"src/app"`）同梱，init 后绑定 scriptId + `npm run build` + `clasp push`（同 Expo native 属部署束缚、不在绿门控内）。**`create-next-app --js` / `create-expo-app`（默认 TS→JS+JSDoc 化：`.ts/.tsx`→`.js/.jsx`、JSDoc 化、`tsconfig`→`jsconfig`、`metro/babel`→`.cjs`、禁用 typed routes）与固有配置（`turbo.json` / `next.config` 的 `transpilePackages` / Expo `web.output`）现只在模板的一次性生成/再生成侧执行**（原最高风险工序移至维护者侧，并有 `turbo typecheck test` 把关）。模板版本由 `/supa-init` 以 tag 固定引用（建议与插件版本/tag 同步）。
+- **init** — `/supa-init` 以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（`degit magcen-zone/supa-starter#vX.Y.Z`），用内置 `scripts/rename-starter.mjs` 把占位名 `next-app` / `expo-app` / `gas-app` / `core`（`@app/core`）确定性重命名为项目名（目录 + 文件内 token + `app.json` + 锁文件 workspace 项；并删模板 README/LICENSE），再 `npm install`（非 `npm ci`，以保留外部依赖锁定）+ `npm run check` 确认为绿。模板已是 `npm run check` 为绿、无 `throw` 桩的实现就绪雏形。**`app/gas-app`（Google Apps Script，结构与 next/expo 统一）**：`src/app` 为 push 目标——手写 GAS 全局脚本（无模块语法）的薄壳入口 + `appsscript.json`；业务逻辑置于 `src/helper`·`src/action` 用 Jest 固化（与 next/expo 同一 TDD），连同 workspace `@app/*` + npm 依赖在 `vendor-pack.js` 单文件以命名空间声明（类型自动追従），经 esbuild 打包为 `src/app/vendor.js`（global `Vendor`，运行时经 `deps()` 访问）、`clasp` push `src/app`；含 placeholder `scriptId` 的 `.clasp.json`（`rootDir:"src/app"`）同梱，init 后绑定 scriptId + `npm run build` + `clasp push`（同 Expo native 属部署束缚、不在绿门控内）。**`create-next-app --js` / `create-expo-app`（默认 TS→JS+JSDoc 化：`.ts/.tsx`→`.js/.jsx`、JSDoc 化、`tsconfig`→`jsconfig`、`metro/babel`→`.cjs`、禁用 typed routes）与固有配置（`next.config` 的 `transpilePackages` / Expo `web.output`）现只在模板的一次性生成/再生成侧执行**（原最高风险工序移至维护者侧，并有 `npm run check` 把关）。模板版本由 `/supa-init` 以 tag 固定引用（建议与插件版本/tag 同步）。
 - **中立性** — supadevops 对部署、托管保持中立，不以特定服务（EAS / Vercel / App Hosting / Cloud Run / Firebase Hosting 等）为前提。部署目标、网络、IAM、应用的角色划分由开发者裁量（§1.4 末尾为本社的参考例）。

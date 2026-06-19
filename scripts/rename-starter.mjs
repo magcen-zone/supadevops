@@ -189,7 +189,7 @@ function main() {
   console.log(
     `rename-starter: 完成。app/${PLACEHOLDER.next}→app/${NEXT}, app/${PLACEHOLDER.expo}→app/${EXPO}, ` +
     `app/${PLACEHOLDER.gas}→app/${GAS}, package/${PLACEHOLDER.libSlug}→package/${LIB}（@app/${LIB}）。改动文件 ${changed} 个。` +
-    `\n下一步：在 ${dest} 执行 npm install，然后 npx turbo run typecheck test。`,
+    `\n下一步：在 ${dest} 执行 npm install，然后 npm run check。`,
   );
 }
 

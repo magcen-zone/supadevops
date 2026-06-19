@@ -1,10 +1,10 @@
 ---
-description: 从 supa-starter 冻结模板取得并确定性重命名，初始化一个对部署保持中立的 npm workspaces + turborepo monorepo（Next.js / Expo + 共享库）
+description: 从 supa-starter 冻结模板取得并确定性重命名，初始化一个对部署保持中立的 npm workspaces monorepo（Next.js / Expo + 共享库）
 argument-hint: [next-<名> 例: next-shop] [expo-<名> 例: expo-shop] [gas-<名> 例: gas-ops] [lib-<名> 例: order]
 allowed-tools: Bash, Read
 ---
 
-以 supadevops 的**冻结起步模板** `magcen-zone/supa-starter`（已确认 `turbo run typecheck test` 为绿）初始化 monorepo。**不再每次用 `create-next-app` / `create-expo-app` 重新生成**（那是非确定性的，尤其 Expo 的 TS→JS+JSDoc 转换）——改为**以固定 tag 取得模板（degit）+ 确定性重命名**。`create-*` 与转换只在模板的维护侧执行一次。
+以 supadevops 的**冻结起步模板** `magcen-zone/supa-starter`（已确认 `npm run check` 为绿）初始化 monorepo。**不再每次用 `create-next-app` / `create-expo-app` 重新生成**（那是非确定性的，尤其 Expo 的 TS→JS+JSDoc 转换）——改为**以固定 tag 取得模板（degit）+ 确定性重命名**。`create-*` 与转换只在模板的维护侧执行一次。
 
 输入（若无则向用户确认）: $ARGUMENTS
 - 解析为四个名字：**next 应用名 / expo 应用名 / gas 应用名 / 共享库名**（均须匹配 `^[a-z0-9][a-z0-9-]*$`，例 `next-shop` / `expo-shop` / `gas-ops` / `order`）。
@@ -12,7 +12,7 @@ allowed-tools: Bash, Read
 固定引用（模板版本，随 supadevops 发布同步更新）:
 
 ```
-SUPA_STARTER_REF = magcen-zone/supa-starter#v0.6.2
+SUPA_STARTER_REF = magcen-zone/supa-starter#v0.7.0
 ```
 
 **必须以 tag 固定**（不用 `dev` / `main`，避免取到未审查的模板，保证可重复）。
@@ -27,13 +27,13 @@ SUPA_STARTER_REF = magcen-zone/supa-starter#v0.6.2
 ## 1. 取得模板（degit，固定 tag）
 
 ```bash
-npx --yes degit "magcen-zone/supa-starter#v0.6.2" .
+npx --yes degit "magcen-zone/supa-starter#v0.7.0" .
 ```
 
 degit 取得该 tag 的快照（**无 `.git` / 无 `node_modules`**）。失败时回退到浅克隆：
 
 ```bash
-git clone --depth 1 --branch v0.6.2 git@github.com:magcen-zone/supa-starter.git .supa-tmp \
+git clone --depth 1 --branch v0.7.0 git@github.com:magcen-zone/supa-starter.git .supa-tmp \
   && rm -rf .supa-tmp/.git && cp -R .supa-tmp/. . && rm -rf .supa-tmp
 ```
 
@@ -51,11 +51,11 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/rename-starter.mjs" . --next <next-名> --ex
 
 ```bash
 npm install
-npx turbo run typecheck test
+npm run check
 ```
 
 - 用 **`npm install`（不是 `npm ci`）**：重命名改写了锁文件的 workspace 名，`npm install` 在**保留外部依赖精确锁定**的同时重建 `node_modules`。
-- `turbo run typecheck test` 须为绿（全 workspace 的 `tsc -p jsconfig.json --noEmit` + `jest`〔含 jest-expo〕）。**为红则停止、提示末尾日志**（与 Stop 钩子契约一致）。
+- `npm run check`（= `npm run typecheck && npm run test`，经 npm workspaces 跑全 workspace 的 `tsc -p jsconfig.json --noEmit` + `jest`〔含 jest-expo〕）须为绿。**为红则停止、提示末尾日志**（与 Stop 钩子契约一致）。
 
 ## 4. 完成报告
 - 展示生成的目录树（`app/<next>` / `app/<expo>` / `app/<gas>` / `package/<lib>`）与下一步：用 **`/supa`** 进行首个功能的契约→测试→实现。
