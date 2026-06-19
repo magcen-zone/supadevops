@@ -12,7 +12,7 @@ allowed-tools: Bash, Read
 固定引用（模板版本，随 supadevops 发布同步更新）:
 
 ```
-SUPA_STARTER_REF = magcen-zone/supa-starter#v0.5.0
+SUPA_STARTER_REF = magcen-zone/supa-starter#v0.6.0
 ```
 
 **必须以 tag 固定**（不用 `dev` / `main`，避免取到未审查的模板，保证可重复）。
@@ -27,13 +27,13 @@ SUPA_STARTER_REF = magcen-zone/supa-starter#v0.5.0
 ## 1. 取得模板（degit，固定 tag）
 
 ```bash
-npx --yes degit "magcen-zone/supa-starter#v0.5.0" .
+npx --yes degit "magcen-zone/supa-starter#v0.6.0" .
 ```
 
 degit 取得该 tag 的快照（**无 `.git` / 无 `node_modules`**）。失败时回退到浅克隆：
 
 ```bash
-git clone --depth 1 --branch v0.5.0 git@github.com:magcen-zone/supa-starter.git .supa-tmp \
+git clone --depth 1 --branch v0.6.0 git@github.com:magcen-zone/supa-starter.git .supa-tmp \
   && rm -rf .supa-tmp/.git && cp -R .supa-tmp/. . && rm -rf .supa-tmp
 ```
 
@@ -60,7 +60,7 @@ npx turbo run typecheck test
 ## 4. 完成报告
 - 展示生成的目录树（`app/<next>` / `app/<expo>` / `app/<gas>` / `package/<lib>`）与下一步：用 **`/supa`** 进行首个功能的契约→测试→实现。
 - 模板已是**实现就绪的雏形**（无 `throw new Error('not implemented')` 桩；`package/<lib>` 含示例 helper + 通过的单测，可替换/删除）。
-- **`app/<gas>`（Google Apps Script）需一次性绑定**：`appsscript.json` 与 `.clasp.json`（含 placeholder `scriptId`）已同梱。步骤：`clasp login` → 在 Apps Script 创建项目取得 scriptId → 替换 `app/<gas>/.clasp.json` 的 `scriptId`（`rootDir:"src"` 已就绪）→ `npm run build -w app/<gas>`（esbuild 生成 `src/vendor.js`）→ `clasp push`。与 Expo native 同属**部署束缚、不在绿门控内**。
+- **`app/<gas>`（Google Apps Script）需一次性绑定**：`appsscript.json` 与 `.clasp.json`（含 placeholder `scriptId`）已同梱于 `src/app/`。结构与 next/expo 统一——`src/app` 为 push 目标（薄壳入口），业务逻辑置于 `src/helper`·`src/action` 用 Jest 固化、经 `vendor-pack.js`→esbuild 打包进 `src/app/vendor.js`。步骤：`clasp login` → 在 Apps Script 创建项目取得 scriptId → 替换 `app/<gas>/.clasp.json` 的 `scriptId`（`rootDir:"src/app"` 已就绪）→ `npm run build -w app/<gas>`（esbuild 生成 `src/app/vendor.js`）→ `clasp push`。与 Expo native 同属**部署束缚、不在绿门控内**。
 - **部署由开发者裁量**（App Hosting / Cloud Run / Firebase Hosting / 本地等）。init 不做任何部署配置。
 
 ## 5. 超出模板形状（多 app / 多 lib）

@@ -53,7 +53,9 @@ flowchart TD
 | React 组件 / page / layout（next UI） | **end2end（Playwright）** |
 | Expo 逻辑（`app/expo-*/src/`） | **Jest（jest-expo）** |
 | Expo UI web | **end2end（Playwright）** / Expo UI native | **end2end（Maestro）** |
+| GAS 业务逻辑（`app/gas-*/src/helper`·`src/action`） | **Jest 单元**（GAS 运行时不跑 Jest：逻辑抽到 helper/共享库测试，经 `vendor-pack.js`→esbuild→`src/app/vendor.js` 注入运行时；`src/app` 的 GAS 入口 doGet/触发器保持薄壳） |
 
+- **统一的 `src/app` 模型**：三类应用一致——`src/app` = 平台入口（next 路由 / Expo 画面 / GAS push 入口），保持薄壳；`src/helper`·`src/action`·`src/type` = 纯逻辑，用 Jest 固化。
 - **将全部 next 路由（page/layout）与 Expo 全部画面无一例外地纳入 end2end 对象**。
 - **不使用** RTL / jsdom。Route Handler、Server Action、UI 保持轻薄，确定性处理抽出到 helper 并用 Jest 固化。
 - **公共服务**（自有内部共享）与 **外部服务**（第三方）是不同概念。两者均在测试中 stub/mock。
@@ -61,7 +63,13 @@ flowchart TD
 ## 规约（文件内顺序、测试放置位置、类型检查）
 - **文件内顺序**：import → `@typedef` → export 函数/class → 非公开 helper。说明**仅用多行块 JSDoc**（`/**` / ` * @tag …` / ` */` 各占一行，位于对象正上方；不写一行式 `/** @type {X} */`、也不写在代码同行末尾）。不写说明行为的行内 `//`（例外仅为 `'use server'`/`'use client'`）。
 - **测试放置位置**：不与业务文件混放，使用独立文件。单元置于实现旁的 `<name>.test.js`。endpoint=`src/endpoint/`、end2end（web）=`src/end2end/`（Expo 为 `src/end2end/web/`）、Maestro=`src/end2end/native/*.yaml`。
-- **类型检查**：每个 workspace 的 `jsconfig.json`（`allowJs`/`checkJs`/`noEmit`/`jsx`/`types`）。`checkJs:true` 已检查 include 内全部 `.js/.jsx`，故**无需 per-file `// @ts-check`**。测试类型来自 import（`@jest/globals` / `@playwright/test`）。
+- **类型检查**：每个 workspace 的 `jsconfig.json`（`allowJs`/`checkJs`/`noEmit`/`jsx`/`types`）。`checkJs:true` 已检查 include（`src`）内全部 `.js/.jsx`，故 include 内**无需 per-file `// @ts-check`**；但 **include 外（=不被 `checkJs` 覆盖）的 js（各 workspace 根的 `jest.config.*` / `next.config.mjs` / `playwright.config.*` / `babel`·`metro.config.cjs` 等）必须在开头加 `// @ts-check`**。扩展名：**`type:module` 未覆盖的 ESM 文件用 `.mjs`，`type:module` 下的 CJS 配置用 `.cjs`**。测试类型来自 import（`@jest/globals` / `@playwright/test`）。
+- **跨 workspace 的类型复用**：要在别 workspace 引用某库的 `@typedef`，须在**该库入口 `package/<lib>/src/index.js` 再声明**——`export { fn } from './helper/x.js'` 只再导出值、不带出其 `@typedef`，且 `exports` 仅暴露 `"."` 故 deep import 被禁。每个 `@typedef` 独占一个 JSDoc 块（同块多个会触发 TS8021）：
+```js
+/**
+ * @typedef {import('./helper/order.js').OrderItem} OrderItem
+ */
+```
 
 ## 填写示例
 
@@ -168,6 +176,18 @@ test('POST /api/orders 创建订单', async ({ request }) => {
   expect(res.status()).toBe(201);
 });
 ```
+
+endpoint/end2end 需要 `playwright.config.js`（最小骨架；含 `// @ts-check`，因在 `src` 之外不被 `tsc -p jsconfig.json` 覆盖）。jest 只匹配 `*.test.js`，`*.spec.js` 不与单测冲突：
+```js
+// @ts-check
+import { defineConfig } from '@playwright/test';
+export default defineConfig({
+  testDir: './src/endpoint',
+  use: { baseURL: 'http://127.0.0.1:3100' },
+  webServer: { command: 'npm run dev -- -p 3100', url: 'http://127.0.0.1:3100', timeout: 120_000 },
+});
+```
+公共/外部服务以 dev 服务器启动时的 env 桩化（不在测试进程内 mock）。
 
 ## 迭代循环与回归安全
 

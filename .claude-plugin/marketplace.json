@@ -1,6 +1,7 @@
 {
   "name": "magcen-zone",
   "owner": { "name": "magcen-zone" },
+  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official"],
   "metadata": {
     "description": "supadevops 分发用 marketplace(总部: github.com/magcen-zone)。"
   },
