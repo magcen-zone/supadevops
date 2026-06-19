@@ -1,4 +1,3 @@
-// @ts-check
 // supadevops — supa-starter 模板的确定性重命名引擎（零依赖 Node）。
 //
 // 由 /supa-init 在 degit 取得模板后调用：将固定占位名

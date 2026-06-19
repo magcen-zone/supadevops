@@ -8,7 +8,7 @@ tools: Read, Grep, Glob, Bash
 
 ## 评审维度
 1. **契约优先** — module / class / function / component props / `@typedef` 是否有多层 JSDoc。`@param` / `@returns` / `@throws` 与一行的意图是否齐备。未实现是否以 `throw` 桩表达，是否不存在进度的双重管理。
-2. **类型** — 每个工作区的 `jsconfig`(`allowJs`/`checkJs:true`/`noEmit`/`jsx`/`types`)以 `checkJs` 检查全 `src`(src 内无需 per-file `// @ts-check`；但 **include 外的配置文件须加 `// @ts-check`**，`type:module` 未覆盖的 ESM 须为 `.mjs`、`type:module` 下 CJS 配置须为 `.cjs`)、是否未创建 `.d.ts`。测试类型是否统一由 import 提供(`@jest/globals` / `@playwright/test`)。
+2. **类型** — 每个工作区的 `jsconfig`(`allowJs`/`checkJs:true`/`noEmit`/`jsx`/`types`)以 `checkJs` 检查全 `src`。**不使用 per-file `// @ts-check`**（统一由 checkJs；include 外的配置/脚本不纳入检查）。扩展名：`type:module` 下用 `.js`、`.mjs` 仅限不被 type:module 覆盖的独立脚本、`.cjs` 仅限 Expo 的 babel/metro。是否未创建 `.d.ts`。测试类型是否统一由 import 提供(`@jest/globals` / `@playwright/test`)。
 3. **按代码类别的测试** — 助手·Server Action·Expo 逻辑·共享库=Jest(Expo 为 jest-expo)、Route Handler=endpoint、UI=end2end(web/Expo web=Playwright、Expo native=Maestro)。全部 next 路由(page/layout)与 Expo 全部画面是否为 end2end 对象。是否未使用 RTL/jsdom。
 4. **放置位置** — 测试为独立文件(`.test.js` / `.spec.js` / Maestro `.yaml`)。是否未在业务文件中混入测试。Maestro 是否在 `src/end2end/native/`。
 5. **文件内规约** — 标准顺序，说明仅用多行块 JSDoc·置于对象正上方(无一行式 `/** @type {X} */`)，无说明行为的行内 `//`，ESM。

@@ -63,7 +63,7 @@ flowchart TD
 ## 规约（文件内顺序、测试放置位置、类型检查）
 - **文件内顺序**：import → `@typedef` → export 函数/class → 非公开 helper。说明**仅用多行块 JSDoc**（`/**` / ` * @tag …` / ` */` 各占一行，位于对象正上方；不写一行式 `/** @type {X} */`、也不写在代码同行末尾）。不写说明行为的行内 `//`（例外仅为 `'use server'`/`'use client'`）。
 - **测试放置位置**：不与业务文件混放，使用独立文件。单元置于实现旁的 `<name>.test.js`。endpoint=`src/endpoint/`、end2end（web）=`src/end2end/`（Expo 为 `src/end2end/web/`）、Maestro=`src/end2end/native/*.yaml`。
-- **类型检查**：每个 workspace 的 `jsconfig.json`（`allowJs`/`checkJs`/`noEmit`/`jsx`/`types`）。`checkJs:true` 已检查 include（`src`）内全部 `.js/.jsx`，故 include 内**无需 per-file `// @ts-check`**；但 **include 外（=不被 `checkJs` 覆盖）的 js（各 workspace 根的 `jest.config.*` / `next.config.mjs` / `playwright.config.*` / `babel`·`metro.config.cjs` 等）必须在开头加 `// @ts-check`**。扩展名：**默认 ESM**（`type:module` 下的 `.js` 或 `.mjs`）；**`.cjs` 仅限「同步加载、不接受 ESM」的工具配置**——Expo 的 `babel.config`（Babel 同步加载 ESM 会抛 "only supported when running Babel asynchronously"）与 `metro.config`（Metro 同步 require）。jest 等其余配置一律 ESM（如 `jest.config.mjs`）。测试类型来自 import（`@jest/globals` / `@playwright/test`）。
+- **类型检查**：每个 workspace 的 `jsconfig.json`（`allowJs`/`checkJs`/`noEmit`/`jsx`/`types`）。`checkJs:true` 一括检查 include（`src`）内全部 `.js/.jsx`。**不使用 per-file `// @ts-check`**（统一由 `checkJs` 把关）；include 外的配置/脚本（`jest.config.js` / `next.config.js` / `playwright.config.js` / `babel`·`metro.config.cjs` 等）不纳入类型检查（trivial，可接受）。扩展名：**ESM 为默认——`type:module` 下一律 `.js`**；`.mjs` 仅用于不被 `type:module` 覆盖的独立脚本（如插件的 `scripts/*.mjs`）；`.cjs` 仅用于「同步加载、不接受 ESM」的工具配置——Expo 的 `babel.config`（Babel 同步加载 ESM 会抛 "only supported when running Babel asynchronously"）与 `metro.config`（Metro 同步 require）。测试类型来自 import（`@jest/globals` / `@playwright/test`）。
 - **跨 workspace 的类型复用**：要在别 workspace 引用某库的 `@typedef`，须在**该库入口 `package/<lib>/src/index.js` 再声明**——`export { fn } from './helper/x.js'` 只再导出值、不带出其 `@typedef`，且 `exports` 仅暴露 `"."` 故 deep import 被禁。每个 `@typedef` 独占一个 JSDoc 块（同块多个会触发 TS8021）：
 ```js
 /**
@@ -177,9 +177,8 @@ test('POST /api/orders 创建订单', async ({ request }) => {
 });
 ```
 
-endpoint/end2end 需要 `playwright.config.js`（最小骨架；含 `// @ts-check`，因在 `src` 之外不被 `tsc -p jsconfig.json` 覆盖）。jest 只匹配 `*.test.js`，`*.spec.js` 不与单测冲突：
+endpoint/end2end 需要 `playwright.config.js`（最小骨架；在 `src` 之外，不纳入 `tsc -p jsconfig.json` 类型检查）。jest 只匹配 `*.test.js`，`*.spec.js` 不与单测冲突：
 ```js
-// @ts-check
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './src/endpoint',

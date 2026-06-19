@@ -8,7 +8,7 @@ tools: Read, Edit, Write, Bash, Grep, Glob
 
 ## 应遵守的纪律
 - **不改变契约。** JSDoc 的 `@param` / `@returns` / `@typedef` 与意图(行为)是既定给出的。将实现收敛于此。若契约有缺漏，不要擅自更改，而是向调用方报告。
-- **文件内顺序**：import → `@typedef` → export 函数/class → 非公开 helper。说明仅用多行块 JSDoc(`/**` / ` * @tag …` / ` */` 各占一行，置于对象正上方；不写一行式 `/** @type {X} */`、也不写在代码同行末尾)。不要写说明行为的行内 `//`(机械式指令除外)。类型检查靠 jsconfig 的 `checkJs:true` 覆盖全 src，故 src 内**无需 per-file `// @ts-check`**；但 include 外的配置文件（`jest.config.*` / `next.config.mjs` / `playwright.config.*` 等）须在开头加 `// @ts-check`，`type:module` 未覆盖的 ESM 文件用 `.mjs`。
+- **文件内顺序**：import → `@typedef` → export 函数/class → 非公开 helper。说明仅用多行块 JSDoc(`/**` / ` * @tag …` / ` */` 各占一行，置于对象正上方；不写一行式 `/** @type {X} */`、也不写在代码同行末尾)。不要写说明行为的行内 `//`(机械式指令除外)。类型检查靠 jsconfig 的 `checkJs:true` 覆盖全 src，**不使用 per-file `// @ts-check`**（统一由 checkJs；include 外的配置/脚本不纳入类型检查）。ESM 为默认：`type:module` 下用 `.js`，`.mjs` 仅限不被 type:module 覆盖的独立脚本，`.cjs` 仅限 Expo 的 babel/metro。
 - **ESM**。不要遗留 `throw new Error('not implemented')`。
 - **保持轻薄**：将不含 framework API(`cookies()` 等)或 I/O 的确定性处理提取到 `src/helper/`(若共享则到 `package/*`)，并用 Jest 单元固化。
 

@@ -12,7 +12,7 @@ allowed-tools: Bash, Read
 固定引用（模板版本，随 supadevops 发布同步更新）:
 
 ```
-SUPA_STARTER_REF = magcen-zone/supa-starter#v0.6.1
+SUPA_STARTER_REF = magcen-zone/supa-starter#v0.6.2
 ```
 
 **必须以 tag 固定**（不用 `dev` / `main`，避免取到未审查的模板，保证可重复）。
@@ -27,13 +27,13 @@ SUPA_STARTER_REF = magcen-zone/supa-starter#v0.6.1
 ## 1. 取得模板（degit，固定 tag）
 
 ```bash
-npx --yes degit "magcen-zone/supa-starter#v0.6.1" .
+npx --yes degit "magcen-zone/supa-starter#v0.6.2" .
 ```
 
 degit 取得该 tag 的快照（**无 `.git` / 无 `node_modules`**）。失败时回退到浅克隆：
 
 ```bash
-git clone --depth 1 --branch v0.6.1 git@github.com:magcen-zone/supa-starter.git .supa-tmp \
+git clone --depth 1 --branch v0.6.2 git@github.com:magcen-zone/supa-starter.git .supa-tmp \
   && rm -rf .supa-tmp/.git && cp -R .supa-tmp/. . && rm -rf .supa-tmp
 ```
 
