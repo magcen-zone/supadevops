@@ -102,9 +102,11 @@ supadevops 以 **npm workspaces + turborepo 的 monorepo** 为单位适用。一
 │     ├─ vendor-pack.js            # esbuild 入口：re-export 依赖 + 本地 src/helper（→ src/app/vendor.js）
 │     ├─ .clasp.json               # rootDir: src/app
 │     ├─ jsconfig.json
-│     └─ src/
-│        ├─ helper/ action/ type/  # 纯逻辑（Jest 固化）
-│        └─ app/                   # GAS 入口(doGet/触发器)+appsscript.json+vendor.js（打包出力=push 对象）
+│     └─ src/                      # 与 next/expo 同形（end2end 扁平，无 web/native）
+│        ├─ helper/ action/ component/ type/   # 纯逻辑（Jest 固化，经 vendor-pack 注入运行时）
+│        ├─ app/                   # GAS 入口(doGet/触发器)+appsscript.json+vendor.js（打包出力=push 对象）
+│        ├─ endpoint/              # doGet/doPost web app 的受入（可选）
+│        └─ end2end/               # 扁平（GAS 无 web/native 区分）
 └─ package/                        # 共享库群（可多个）
    ├─ order/                       # 例: 平台无关逻辑、类型
    │  ├─ package.json
