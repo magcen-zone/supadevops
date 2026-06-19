@@ -1,7 +1,7 @@
 {
   "name": "supadevops",
   "displayName": "supadevops",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "向 Next.js(App Router)/ Expo 的 npm workspaces + turborepo monorepo 施加 JSDoc 契约优先 + TDD 开发流程的 Superpowers 增强插件。",
   "author": { "name": "EISYOU", "email": "eneisyou@gmail.com" },
   "homepage": "https://github.com/magcen-zone/supadevops",
