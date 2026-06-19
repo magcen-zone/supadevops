@@ -66,6 +66,6 @@ npx turbo run typecheck test
 ## 5. 超出模板形状（多 app / 多 lib）
 
 模板为正准 **1×next + 1×expo + 1×gas + 1×lib**。如需更多，**取得后手动调整**（仍是确定性的复制 + 改名，不重新跑 `create-*`）：
-- **追加共享库**：复制 `package/<lib>` 为新目录，改其 `package.json` 的 `name`（`@app/<新>`），并在用到的 app 的 `dependencies` 与 `next.config.mjs` 的 `transpilePackages` 中登记。
+- **追加共享库**：复制 `package/<lib>` 为新目录，改其 `package.json` 的 `name`（`@app/<新>`），并在用到的 app 的 `dependencies` 与 `next.config.js` 的 `transpilePackages` 中登记。
 - **追加 next / expo / gas 应用**：复制对应 `app/<名>` 目录并改名（`package.json` 的 `name`、Expo 的 `app.json` slug/name、GAS 的 `.clasp.json` 等）。
 - 或在 `magcen-zone/supa-starter` 用其再生成步骤生成不同形状（维护者侧）。`create-next-app` / `create-expo-app` + TS→JS+JSDoc 转换现**仅存在于该模板的生成侧**，不在本命令的用户运行时。

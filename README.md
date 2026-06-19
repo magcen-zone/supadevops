@@ -73,27 +73,38 @@ supadevops 以 **npm workspaces + turborepo 的 monorepo** 为单位适用。一
 ├─ turbo.json                      # build/dev/lint/typecheck/test 的任务管线
 ├─ app/
 │  ├─ next-shop/                   # create-next-app（JS、src/app）
-│  │  ├─ package.json
-│  │  ├─ next.config.mjs           # transpilePackages: 取入 package/*（§3.7）
+│  │  ├─ package.json              # "type":"module"
+│  │  ├─ next.config.js            # ESM(.js)。transpilePackages: 取入 package/*（§3.7）
+│  │  ├─ jest.config.js / playwright.config.js
 │  │  ├─ jsconfig.json             # checkJs + types:["node"]（§3.5）
 │  │  └─ src/
 │  │     ├─ helper/ action/ component/ type/
 │  │     ├─ app/                   # page、layout、api/**/route.js
 │  │     ├─ endpoint/              # endpoint（Playwright request）
 │  │     └─ end2end/               # end2end（web、Playwright）
-│  └─ expo-shop/                   # create-expo-app（既定 TS→JS+JSDoc 化）
-│     ├─ package.json
-│     ├─ app.json                  # web.output: single | static（将来也含 server）
-│     ├─ metro.config.cjs          # CJS（因 type:module）
-│     ├─ babel.config.cjs          # CJS
+│  ├─ expo-shop/                   # create-expo-app（既定 TS→JS+JSDoc 化）
+│  │  ├─ package.json              # "type":"module"
+│  │  ├─ app.json                  # web.output: single | static（将来也含 server）
+│  │  ├─ metro.config.cjs          # CJS（Metro 同步加载配置，ESM 不可）
+│  │  ├─ babel.config.cjs          # CJS（Babel 同步加载，ESM 会抛错）
+│  │  ├─ jest.config.js / playwright.config.js
+│  │  ├─ jsconfig.json
+│  │  └─ src/                      # 与 Next 同形（endpoint/ action/ 为将来 SSR 预留）
+│  │     ├─ helper/ action/ component/ type/
+│  │     ├─ app/                   # Expo Router 画面（src/app）
+│  │     ├─ endpoint/              # 将来 SSR（web.output:'server'）的 API routes 用
+│  │     └─ end2end/
+│  │        ├─ web/                # Playwright
+│  │        └─ native/             # Maestro（*.yaml）
+│  └─ gas-ops/                     # Google Apps Script（与 next/expo 同构：src/app=push 入口）
+│     ├─ package.json              # "type":"module"
+│     ├─ jest.config.js
+│     ├─ vendor-pack.js            # esbuild 入口：re-export 依赖 + 本地 src/helper（→ src/app/vendor.js）
+│     ├─ .clasp.json               # rootDir: src/app
 │     ├─ jsconfig.json
-│     └─ src/                      # 与 Next 同形（endpoint/ action/ 为将来 SSR 预留）
-│        ├─ helper/ action/ component/ type/
-│        ├─ app/                   # Expo Router 画面（src/app）
-│        ├─ endpoint/              # 将来 SSR（web.output:'server'）的 API routes 用
-│        └─ end2end/
-│           ├─ web/                # Playwright
-│           └─ native/             # Maestro（*.yaml）
+│     └─ src/
+│        ├─ helper/ action/ type/  # 纯逻辑（Jest 固化）
+│        └─ app/                   # GAS 入口(doGet/触发器)+appsscript.json+vendor.js（打包出力=push 对象）
 └─ package/                        # 共享库群（可多个）
    ├─ order/                       # 例: 平台无关逻辑、类型
    │  ├─ package.json
@@ -601,7 +612,7 @@ supadevops/                               # GitHub: magcen-zone/supadevops 分�
 └── README.md
 ```
 
-以 skill 为核心，内置 subagent / hook / command。`workflow` 不存在于插件的组件定义中，故不内置模板，由各 `supa-<功能>` skill 在需要时生成 `.claude/workflows/supa-<功能>-workflow.js` 以实体化（§5）。`/supa-init` 是命令，以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）、由内置的 `scripts/rename-starter.mjs` 确定性重命名占位名，再 `npm install` + `turbo run typecheck test` 确认为绿。`create-next-app` / `create-expo-app` 与 Expo 的 TS→JS+JSDoc 转换现仅存在于该模板的维护/生成侧（§8），不在用户每次运行时（消除非确定性）。`app/gas-app`（Google Apps Script）则为手写 GAS 全局脚本 + `vendor-pack.js` 声明依赖经 esbuild 打包（`src/vendor.js`）+ clasp，无 create-* 工序。
+以 skill 为核心，内置 subagent / hook / command。`workflow` 不存在于插件的组件定义中，故不内置模板，由各 `supa-<功能>` skill 在需要时生成 `.claude/workflows/supa-<功能>-workflow.js` 以实体化（§5）。`/supa-init` 是命令，以固定 tag 取得冻结模板 `magcen-zone/supa-starter`（degit）、由内置的 `scripts/rename-starter.mjs` 确定性重命名占位名，再 `npm install` + `turbo run typecheck test` 确认为绿。`create-next-app` / `create-expo-app` 与 Expo 的 TS→JS+JSDoc 转换现仅存在于该模板的维护/生成侧（§8），不在用户每次运行时（消除非确定性）。`app/gas-app`（Google Apps Script，与 next/expo 同构：`src/app` 为 push 入口）则为 `src/app` 的薄壳 GAS 全局脚本（doGet/触发器）+ 业务逻辑置于 `src/helper`（Jest 固化）经 `vendor-pack.js` re-export 由 esbuild 打包为 `src/app/vendor.js` + clasp push `src/app`，无 create-* 工序。
 
 ---
 
